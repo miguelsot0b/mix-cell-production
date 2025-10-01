@@ -12,7 +12,15 @@ from config import *
 # Configuración de Google Drive se importa desde config.py
 
 def download_from_google_drive(file_id, output_path):
-    """Descarga un archivo desde Google Drive usando su ID"""
+    """Descarga un archivo desd    function updateCountdown() {
+        if (totalSeconds <= 0) {
+            document.getElementById('countdown-text').textContent = 'Actualizando...';
+            // Recargar página después de 3 segundos
+            setTimeout(() => { 
+                location.reload(); 
+            }, 3000);
+            return;
+        }le Drive usando su ID"""
     try:
         url = f"https://drive.google.com/uc?id={file_id}"
         gdown.download(url, output_path, quiet=False)
@@ -54,10 +62,13 @@ def format_countdown_message(minutes, seconds):
     else:
         return f"🕐 Próxima actualización: en {seconds} segundos"
 
-def check_file_age(file_path, max_age_seconds=None):
+def check_file_age(file_path, max_age_seconds=None, force_update=False):
     """Verifica si un archivo necesita actualizarse basado en horarios específicos (minuto 5 y 35 de cada hora)"""
     if not os.path.exists(file_path):
         return True  # Archivo no existe, necesita descarga
+    
+    if force_update:
+        return True  # Forzar actualización
     
     # Obtener tiempo actual
     now = datetime.now()
@@ -66,17 +77,17 @@ def check_file_age(file_path, max_age_seconds=None):
     # Obtener última modificación del archivo
     last_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
     
-    # Determinar si estamos en una ventana de actualización (minuto 5 o 35)
-    is_update_window = current_minute == 5 or current_minute == 35
+    # Determinar si estamos en una ventana de actualización (minutos 5-7 o 35-37 para dar margen)
+    is_update_window = (5 <= current_minute <= 7) or (35 <= current_minute <= 37)
     
     if not is_update_window:
         return False  # No estamos en ventana de actualización
     
     # Si estamos en ventana de actualización, verificar si ya se actualizó en esta ventana
     # Calcular la ventana actual (hora + minuto específico)
-    if current_minute == 5:
+    if 5 <= current_minute <= 7:
         current_window = now.replace(minute=5, second=0, microsecond=0)
-    else:  # current_minute == 35
+    else:  # 35 <= current_minute <= 37
         current_window = now.replace(minute=35, second=0, microsecond=0)
     
     # Si el archivo fue modificado después del inicio de la ventana actual, no actualizar
@@ -85,11 +96,11 @@ def check_file_age(file_path, max_age_seconds=None):
     
     return True  # Necesita actualización
 
-def update_prp_file():
+def update_prp_file(force_update=False):
     """Actualiza el archivo PRP desde Google Drive si es necesario"""
     
     # Verificar si necesita actualización
-    if check_file_age(PRP_FILE_PATH):
+    if check_file_age(PRP_FILE_PATH, force_update=force_update):
         # Crear directorio si no existe
         os.makedirs(DATA_FOLDER, exist_ok=True)
         
@@ -256,11 +267,11 @@ def get_visual_color(parts_df, part_number):
 
 # Cache para datos con auto-refresh inteligente
 @st.cache_data(ttl=CACHE_TTL)  # Cache basado en configuración
-def load_data():
+def load_data(force_update=False):
     """Carga los datos desde archivos CSV con actualización automática desde Google Drive"""
     try:
         # Actualizar archivo PRP desde Google Drive si es necesario
-        update_prp_file()
+        update_prp_file(force_update=force_update)
         
         # Cargar datos
         parts_df = pd.read_csv(PARTS_FILE_PATH)
@@ -370,6 +381,28 @@ def main():
     
     st.sidebar.markdown(countdown_html, unsafe_allow_html=True)
     
+    # Verificar si se está forzando una actualización desde URL o si es hora de actualizar
+    now = datetime.now()
+    current_minute = now.minute
+    
+    # Forzar actualización si estamos en ventana de actualización
+    force_update = (5 <= current_minute <= 7) or (35 <= current_minute <= 37)
+    
+    # También forzar si el archivo es muy viejo (más de 1 hora)
+    if os.path.exists(PRP_FILE_PATH):
+        last_modified = datetime.fromtimestamp(os.path.getmtime(PRP_FILE_PATH))
+        hours_old = (now - last_modified).total_seconds() / 3600
+        if hours_old > 1:
+            force_update = True
+    
+    if force_update and 'last_forced_update' not in st.session_state:
+        # Limpiar cache y forzar actualización solo una vez por sesión en cada ventana
+        st.cache_data.clear()
+        if os.path.exists(PRP_FILE_PATH):
+            os.remove(PRP_FILE_PATH)  # Eliminar archivo local para forzar descarga
+        st.session_state.last_forced_update = now.strftime('%H:%M')
+        st.rerun()
+    
     # Auto-refresh setup
     if 'last_refresh_time' not in st.session_state:
         st.session_state.last_refresh_time = time.time()
@@ -382,7 +415,7 @@ def main():
 
     # Cargar y validar datos
     try:
-        parts_df, prp_df = load_data()
+        parts_df, prp_df = load_data(force_update=force_update)
         
         if parts_df.empty or prp_df.empty:
             st.error("❌ No se pudieron cargar los datos necesarios")
