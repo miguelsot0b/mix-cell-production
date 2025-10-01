@@ -143,6 +143,46 @@ def add_auto_refresh(interval_seconds):
     """
     st.markdown(refresh_html, unsafe_allow_html=True)
 
+# CSS para escalar todo el contenido a la pantalla manteniendo proporciones
+st.markdown("""
+<style>
+    .main .block-container {
+        max-width: 100%;
+        padding-top: 2rem;
+        padding-bottom: 1rem;
+    }
+    
+    /* Escalar todo el contenido para que se ajuste a la pantalla */
+    @media screen and (max-height: 900px) {
+        .main .block-container {
+            zoom: 0.85;
+            transform-origin: top center;
+        }
+    }
+    
+    @media screen and (max-height: 800px) {
+        .main .block-container {
+            zoom: 0.75;
+            transform-origin: top center;
+        }
+    }
+    
+    @media screen and (max-height: 700px) {
+        .main .block-container {
+            zoom: 0.65;
+            transform-origin: top center;
+        }
+    }
+    
+    /* Para pantallas muy anchas, aprovechar mejor el espacio */
+    @media screen and (min-width: 1400px) {
+        .main .block-container {
+            zoom: 1.1;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Título principal
 st.title("🏭 Sistema de Planificación de Producción MIX")
 
