@@ -39,8 +39,20 @@ def get_next_update_time():
         else:
             next_update = now.replace(hour=now.hour+1, minute=5, second=0, microsecond=0)
     
-    minutes_until = int((next_update - now).total_seconds() / 60)
-    return next_update, minutes_until
+    total_seconds = (next_update - now).total_seconds()
+    minutes_until = int(total_seconds / 60)
+    seconds_until = int(total_seconds % 60)
+    
+    return next_update, minutes_until, seconds_until, total_seconds
+
+def format_countdown_message(minutes, seconds):
+    """Formatea el mensaje del contador de manera dinámica"""
+    if minutes >= 3:
+        return f"🕐 Próxima actualización: en {minutes} minutos"
+    elif minutes > 0:
+        return f"🕐 Próxima actualización: en {minutes} minutos y {seconds} segundos"
+    else:
+        return f"🕐 Próxima actualización: en {seconds} segundos"
 
 def check_file_age(file_path, max_age_seconds=None):
     """Verifica si un archivo necesita actualizarse basado en horarios específicos (minuto 5 y 35 de cada hora)"""
@@ -299,11 +311,64 @@ def main():
     # Información del sistema de actualización
     st.sidebar.markdown("### 📡 Sistema de Actualización")
     
-    # Calcular próxima actualización
-    next_update, minutes_until = get_next_update_time()
-    
     st.sidebar.info(f"• Actualiza a los minutos :05 y :35 de cada hora\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
-    st.sidebar.success(f"🕐 Próxima actualización: en {minutes_until} minutos")
+    
+    # Calcular próxima actualización
+    next_update, minutes_until, seconds_until, total_seconds = get_next_update_time()
+    
+    # Crear contador dinámico con JavaScript
+    countdown_html = f"""
+    <div id="countdown-container" style="
+        background-color: #d4edda; 
+        border: 1px solid #c3e6cb; 
+        border-radius: 0.25rem; 
+        padding: 0.75rem; 
+        margin: 0.5rem 0;
+        color: #155724;
+        font-weight: 500;
+    ">
+        <span style="margin-right: 0.5rem;">🕐</span>
+        <span id="countdown-text">Próxima actualización: en {minutes_until} minutos</span>
+    </div>
+    
+    <script>
+    let totalSeconds = {int(total_seconds)};
+    
+    function updateCountdown() {{
+        if (totalSeconds <= 0) {{
+            document.getElementById('countdown-text').textContent = 'Actualizando...';
+            setTimeout(() => {{ location.reload(); }}, 1000);
+            return;
+        }}
+        
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        
+        let message;
+        if (minutes >= 3) {{
+            message = `Próxima actualización: en ${{minutes}} minutos`;
+        }} else if (minutes > 0) {{
+            message = `Próxima actualización: en ${{minutes}} minutos y ${{seconds}} segundos`;
+        }} else {{
+            message = `Próxima actualización: en ${{seconds}} segundos`;
+        }}
+        
+        document.getElementById('countdown-text').textContent = message;
+        totalSeconds--;
+    }}
+    
+    // Actualizar inmediatamente y luego cada segundo
+    updateCountdown();
+    const countdownInterval = setInterval(updateCountdown, 1000);
+    
+    // Limpiar intervalo si el componente se desmonta
+    window.addEventListener('beforeunload', () => {{
+        clearInterval(countdownInterval);
+    }});
+    </script>
+    """
+    
+    st.sidebar.markdown(countdown_html, unsafe_allow_html=True)
     
     # Auto-refresh setup
     if 'last_refresh_time' not in st.session_state:
