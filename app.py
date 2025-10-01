@@ -372,8 +372,6 @@ def main():
             "refresh_interval": str(refresh_interval)
         })
         
-        # Activar auto-refresh HTML
-        add_auto_refresh(refresh_interval)
     else:
         refresh_interval = 0  # Deshabilitado
         # Actualizar URL params
@@ -525,45 +523,13 @@ def main():
         current_url_family = query_params.get("selected_family")
         
         if selected_cell != current_url_cell or selected_family != current_url_family:
-            # Construir nueva URL con todos los parámetros
-            new_params = {
+            # Actualizar query params de Streamlit
+            st.query_params.update({
                 "refresh_enabled": query_params.get('refresh_enabled', 'true'),
                 "refresh_interval": query_params.get('refresh_interval', '60'),
                 "selected_cell": selected_cell,
                 "selected_family": selected_family
-            }
-            
-            # Actualizar query params de Streamlit
-            st.query_params.update(new_params)
-            
-            # Forzar navegación a la nueva URL (esto causa recarga pero sincroniza todo)
-            st.markdown(f"""
-            <script>
-                // Redirigir inmediatamente a la nueva URL para sincronizar
-                const newUrl = new URL(window.location);
-                newUrl.searchParams.set('refresh_enabled', '{new_params["refresh_enabled"]}');
-                newUrl.searchParams.set('refresh_interval', '{new_params["refresh_interval"]}');
-                newUrl.searchParams.set('selected_cell', '{selected_cell}');
-                newUrl.searchParams.set('selected_family', '{selected_family}');
-                window.location.href = newUrl.toString();
-            </script>
-            """, unsafe_allow_html=True)
-            
-            # También detener ejecución para evitar procesamiento adicional
-            st.stop()
-        
-        # Debug temporal - mostrar valores actuales
-        st.sidebar.write("🔍 **Debug Info:**")
-        st.sidebar.write(f"Session Cell: {st.session_state.get('cell_selection', 'No definido')}")
-        st.sidebar.write(f"Selected Cell: {selected_cell}")
-        st.sidebar.write(f"URL Cell: {current_url_cell}")
-        st.sidebar.write("---")
-        st.sidebar.write(f"Session Family: {st.session_state.get('family_selection', 'No definido')}")
-        st.sidebar.write(f"Selected Family: {selected_family}")
-        st.sidebar.write(f"URL Family: {current_url_family}")
-        st.sidebar.write("---")
-        st.sidebar.write(f"Default Cell Index: {default_cell_index}")
-        st.sidebar.write(f"Default Family Index: {default_family_index}")
+            })
 
     # Filtrar por la celda y familia seleccionadas
     filtered_parts = parts_df[
@@ -628,6 +594,10 @@ def main():
                 
                 # Información del faltante
                 st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
+
+    # Activar auto-refresh HTML al final, después de actualizar todos los params
+    if auto_refresh_enabled:
+        add_auto_refresh(refresh_interval)
 
 if __name__ == "__main__":
     main()
