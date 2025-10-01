@@ -143,56 +143,16 @@ def add_auto_refresh(interval_seconds):
     """
     st.markdown(refresh_html, unsafe_allow_html=True)
 
-# CSS para escalar todo el contenido a la pantalla manteniendo proporciones
+# CSS minimalista para layout limpio
 st.markdown("""
 <style>
     .main .block-container {
         max-width: 100%;
-        padding-top: 2rem;
+        padding-top: 1rem;
         padding-bottom: 1rem;
-    }
-    
-    /* Escalar todo el contenido para que se ajuste a la pantalla */
-    @media screen and (max-height: 900px) {
-        .main .block-container {
-            zoom: 0.85;
-            transform-origin: top center;
-        }
-    }
-    
-    @media screen and (max-height: 800px) {
-        .main .block-container {
-            zoom: 0.75;
-            transform-origin: top center;
-        }
-    }
-    
-    @media screen and (max-height: 700px) {
-        .main .block-container {
-            zoom: 0.65;
-            transform-origin: top center;
-        }
-    }
-    
-    /* Para pantallas muy anchas, aprovechar mejor el espacio */
-    @media screen and (min-width: 1400px) {
-        .main .block-container {
-            zoom: 1.1;
-        }
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Título principal
-st.title("🏭 Sistema de Planificación de Producción MIX")
-
-# Nota importante sobre contenedores en almacén
-st.warning("""
-⚠️ **IMPORTANTE**: Este sistema solo cuenta contenedores que estén físicamente en **ALMACÉN**.
-Los contenedores deben ser transferidos al almacén para ser contabilizados en el inventario.
-""")
-
-st.markdown("---")
 
 def clean_number(value):
     """Limpia números que pueden tener comas y los convierte a enteros"""
@@ -523,77 +483,69 @@ def main():
             help="Selecciona el tipo de familia"
         )
 
-    # Área principal
-    with st.container():
-        # Filtrar por la celda y familia seleccionadas
-        filtered_parts = parts_df[
-            (parts_df['cell_name'] == selected_cell) & 
-            (parts_df['family'] == selected_family)
-        ]
+    # Filtrar por la celda y familia seleccionadas
+    filtered_parts = parts_df[
+        (parts_df['cell_name'] == selected_cell) & 
+        (parts_df['family'] == selected_family)
+    ]
+    
+    if filtered_parts.empty:
+        st.warning(f"⚠️ No se encontraron partes para la celda '{selected_cell}' y familia '{selected_family}'")
+        return
+    
+    # Obtener los números de parte para esta combinación
+    part_numbers = []
+    for _, row in filtered_parts.iterrows():
+        part_numbers_str = row['part_numbers']
+        part_numbers.extend([p.strip() for p in part_numbers_str.split(',')])
+    
+    # Análisis PRP
+    with st.spinner("🔍 Analizando datos de PRP..."):
+        prp_analysis = analyze_prp_for_cell(prp_df, part_numbers)
         
-        if filtered_parts.empty:
-            st.warning(f"⚠️ No se encontraron partes para la celda '{selected_cell}' y familia '{selected_family}'")
-            return
+    
+    if not prp_analysis:
+        st.success("✅ No hay partes críticas para esta celda en este momento")
+        st.info("Todas las partes tienen suficiente inventario para cubrir los Customer Releases")
+        return
+    
+    # Obtener TOP 3 partes críticas
+    top_3_parts = get_top_3_critical_parts(prp_analysis, parts_df)
+    
+    if not top_3_parts:
+        st.success("✅ No hay partes críticas para esta celda en este momento")
+        return
+    
+    # Mostrar TOP 3
+    st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
+    
+    # Recordatorio importante sobre contenedores en almacén
+    st.info("📦 Enviar contenedores al **ALMACÉN** tras producir")
+    
+    cols = st.columns(3)
+    
+    for i, part_info in enumerate(top_3_parts):
+        part_number = part_info['part_number']
+        containers = part_info['containers']
+        deficit = part_info['deficit']
         
-        # Obtener los números de parte para esta combinación
-        part_numbers = []
-        for _, row in filtered_parts.iterrows():
-            part_numbers_str = row['part_numbers']
-            part_numbers.extend([p.strip() for p in part_numbers_str.split(',')])
+        # Obtener color de fondo basado en visual_id
+        bg_color = get_visual_color(parts_df, part_number)
         
-        # Análisis PRP
-        with st.spinner("🔍 Analizando datos de PRP..."):
-            prp_analysis = analyze_prp_for_cell(prp_df, part_numbers)
-            
-        
-        if not prp_analysis:
-            st.success("✅ No hay partes críticas para esta celda en este momento")
-            st.info("Todas las partes tienen suficiente inventario para cubrir los Customer Releases")
-            return
-        
-        # Obtener TOP 3 partes críticas
-        top_3_parts = get_top_3_critical_parts(prp_analysis, parts_df)
-        
-        if not top_3_parts:
-            st.success("✅ No hay partes críticas para esta celda en este momento")
-            return
-        
-        # Mostrar TOP 3
-        st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
-        
-        # Recordatorio importante sobre contenedores en almacén
-        st.info("""
-        📦 **RECORDATORIO**: Los contenedores mostrados abajo deben ser enviados al **ALMACÉN** 
-        una vez producidos para que sean contabilizados en el sistema de inventario.
-        """)
-        
-        st.markdown("### Los siguientes contenedores deben producirse:")
-        st.markdown("---")
-        
-        cols = st.columns(3)
-        
-        for i, part_info in enumerate(top_3_parts):
-                part_number = part_info['part_number']
-                containers = part_info['containers']
-                deficit = part_info['deficit']
+        with cols[i]:
+            # Usar componentes nativos de Streamlit en lugar de HTML personalizado
+            with st.container():
+                # Badge de prioridad y título
+                st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>PRIORIDAD #{i+1}</strong></div>", unsafe_allow_html=True)
                 
-                # Obtener color de fondo basado en visual_id
-                bg_color = get_visual_color(parts_df, part_number)
+                # Número de parte con color de fondo
+                st.markdown(f"<div style='background-color: {bg_color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 2px solid rgba(0,0,0,0.1);'><strong>{part_number}</strong></div>", unsafe_allow_html=True)
                 
-                with cols[i]:
-                    # Usar componentes nativos de Streamlit en lugar de HTML personalizado
-                    with st.container():
-                        # Badge de prioridad y título
-                        st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>PRIORIDAD #{i+1}</strong></div>", unsafe_allow_html=True)
-                        
-                        # Número de parte con color de fondo
-                        st.markdown(f"<div style='background-color: {bg_color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 2px solid rgba(0,0,0,0.1);'><strong>{part_number}</strong></div>", unsafe_allow_html=True)
-                        
-                        # Número de contenedores grande
-                        st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
-                        
-                        # Información del faltante
-                        st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
+                # Número de contenedores grande
+                st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
+                
+                # Información del faltante
+                st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
