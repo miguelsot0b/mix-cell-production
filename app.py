@@ -473,38 +473,44 @@ def main():
         # Dropdown 1: Cell Name (sin repetir)
         cell_names = sorted(parts_df['cell_name'].unique().tolist())
         
-        # Obtener valor inicial de URL params para la primera carga
-        if "selected_cell_dropdown" not in st.session_state and query_params.get("selected_cell"):
-            initial_cell = query_params.get("selected_cell") if query_params.get("selected_cell") in cell_names else cell_names[0]
-            initial_cell_index = cell_names.index(initial_cell)
-        else:
-            initial_cell_index = 0
-            
+        # Inicializar valores en session_state solo la primera vez
+        if "selected_cell" not in st.session_state:
+            if query_params.get("selected_cell") and query_params.get("selected_cell") in cell_names:
+                st.session_state.selected_cell = query_params.get("selected_cell")
+            else:
+                st.session_state.selected_cell = cell_names[0]
+                
         selected_cell = st.selectbox(
             "📍 Celda:",
             options=cell_names,
-            index=initial_cell_index,
+            index=cell_names.index(st.session_state.selected_cell),
             key="selected_cell_dropdown",
-            help="Selecciona la celda de producción"
+            help="Selecciona la celda de producción",
+            on_change=lambda: setattr(st.session_state, 'selected_cell', st.session_state.selected_cell_dropdown)
         )
         
         # Dropdown 2: Family (tipos de familia)
         families = sorted(parts_df['family'].unique().tolist())
         
-        # Obtener valor inicial de URL params para la primera carga
-        if "selected_family_dropdown" not in st.session_state and query_params.get("selected_family"):
-            initial_family = query_params.get("selected_family") if query_params.get("selected_family") in families else families[0]
-            initial_family_index = families.index(initial_family)
-        else:
-            initial_family_index = 0
-            
+        # Inicializar valores en session_state solo la primera vez
+        if "selected_family" not in st.session_state:
+            if query_params.get("selected_family") and query_params.get("selected_family") in families:
+                st.session_state.selected_family = query_params.get("selected_family")
+            else:
+                st.session_state.selected_family = families[0]
+                
         selected_family = st.selectbox(
             "🎯 Familia:",
             options=families,
-            index=initial_family_index,
+            index=families.index(st.session_state.selected_family),
             key="selected_family_dropdown",
-            help="Selecciona el tipo de familia"
+            help="Selecciona el tipo de familia",
+            on_change=lambda: setattr(st.session_state, 'selected_family', st.session_state.selected_family_dropdown)
         )
+        
+        # Actualizar session_state con valores actuales de los widgets
+        st.session_state.selected_cell = selected_cell
+        st.session_state.selected_family = selected_family
         
         # Actualizar URL params con los valores actuales
         st.query_params.update({
