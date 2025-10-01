@@ -121,24 +121,25 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
     return top_3
 
 def get_visual_color(parts_df, part_number):
-    """Obtiene el color visual basado en visual_id"""
+    """Obtiene el color visual basado en visual_id con colores mejorados para operadores"""
     try:
         part_info = parts_df[parts_df['part_numbers'] == part_number]
         if not part_info.empty:
             visual_id = part_info.iloc[0]['visual_id']
             
+            # Colores mejorados y más vibrantes para operadores
             color_map = {
-                'Amarillo': '#FFF3CD',
-                'Naranja': '#FFE4B5', 
-                'Rosa': '#FFE4E1',
-                'Verde': '#D4EDDA',
-                'Blanco': '#F8F9FA'
+                'Amarillo': '#FFE135',    # Amarillo brillante
+                'Naranja': '#FF8C42',     # Naranja vibrante
+                'Rosa': '#FF69B4',        # Rosa fuerte
+                'Verde': '#32CD32',       # Verde lima brillante
+                'Blanco': '#F5F5F5'       # Blanco suave
             }
             
-            return color_map.get(visual_id, '#F8F9FA')
+            return color_map.get(visual_id, '#E8E8E8')  # Gris claro por defecto
     except:
         pass
-    return '#F8F9FA'
+    return '#E8E8E8'  # Gris claro por defecto
 
 # Cache para datos con auto-refresh cada 10 minutos
 @st.cache_data(ttl=600)
@@ -252,37 +253,64 @@ def main():
         cols = st.columns(3)
         
         for i, part_info in enumerate(top_3_parts):
-            part_number = part_info['part_number']
-            containers = part_info['containers']
-            deficit = part_info['deficit']
-            
-            # Obtener color de fondo
-            bg_color = get_visual_color(parts_df, part_number)
-            
-            with cols[i]:
-                st.markdown(f"""
-                <div style="background-color: {bg_color}; padding: 25px; border-radius: 15px; 
-                            margin: 10px 0; border-left: 8px solid #d73502; 
-                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;">
-                    <h3 style="margin: 0; color: #d73502;">
-                        #{i+1}
-                    </h3>
-                    <h4 style="margin: 15px 0; color: #333; font-weight: bold;">
-                        {part_number}
-                    </h4>
-                    <div style="margin: 20px 0;">
-                        <div style="font-size: 48px; font-weight: bold; color: #d73502;">
-                            {containers}
+                part_number = part_info['part_number']
+                containers = part_info['containers']
+                deficit = part_info['deficit']
+                
+                # Obtener color de fondo basado en visual_id
+                bg_color = get_visual_color(parts_df, part_number)
+                
+                with cols[i]:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {bg_color} 0%, rgba(255,255,255,0.8) 100%); 
+                                padding: 25px; border-radius: 20px; margin: 10px 0; 
+                                border: 3px solid {bg_color}; 
+                                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); 
+                                text-align: center; position: relative;
+                                transform: scale(1); transition: transform 0.2s;">
+                        
+                        <!-- Badge de prioridad -->
+                        <div style="position: absolute; top: -10px; left: 20px; 
+                                    background-color: #d73502; color: white; 
+                                    padding: 8px 16px; border-radius: 20px; 
+                                    font-weight: bold; font-size: 14px;
+                                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);">
+                            PRIORIDAD #{i+1}
                         </div>
-                        <div style="font-size: 18px; color: #666; margin: 10px 0;">
-                            CONTENEDORES
+                        
+                        <!-- Número de parte con fondo del color -->
+                        <div style="background-color: {bg_color}; 
+                                    margin: 20px -10px 15px -10px; 
+                                    padding: 12px; border-radius: 10px;
+                                    border: 2px solid rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0; color: #333; font-weight: bold; font-size: 16px;">
+                                {part_number}
+                            </h4>
+                        </div>
+                        
+                        <!-- Contenedores - Número grande -->
+                        <div style="margin: 25px 0;">
+                            <div style="font-size: 64px; font-weight: 900; 
+                                        color: #d73502; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                                        line-height: 1;">
+                                {containers}
+                            </div>
+                            <div style="font-size: 20px; color: #333; font-weight: bold; 
+                                        margin-top: 5px; text-transform: uppercase;">
+                                CONTENEDORES
+                            </div>
+                        </div>
+                        
+                        <!-- Información del faltante -->
+                        <div style="background-color: rgba(255,255,255,0.9); 
+                                    padding: 12px; border-radius: 10px; 
+                                    border-top: 3px solid #d73502; margin-top: 20px;">
+                            <strong style="color: #d73502; font-size: 16px;">
+                                Faltante: {deficit:,} piezas
+                            </strong>
                         </div>
                     </div>
-                    <div style="font-size: 14px; color: #666; border-top: 1px solid #ddd; padding-top: 15px;">
-                        <strong>Faltante: {deficit:,} piezas</strong>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
