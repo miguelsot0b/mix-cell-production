@@ -145,6 +145,13 @@ def add_auto_refresh(interval_seconds):
 
 # Título principal
 st.title("🏭 Sistema de Planificación de Producción MIX")
+
+# Nota importante sobre contenedores en almacén
+st.warning("""
+⚠️ **IMPORTANTE**: Este sistema solo cuenta contenedores que estén físicamente en **ALMACÉN**.
+Los contenedores deben ser transferidos al almacén para ser contabilizados en el inventario.
+""")
+
 st.markdown("---")
 
 def clean_number(value):
@@ -513,6 +520,13 @@ def main():
         
         # Mostrar TOP 3
         st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
+        
+        # Recordatorio importante sobre contenedores en almacén
+        st.info("""
+        📦 **RECORDATORIO**: Los contenedores mostrados abajo deben ser enviados al **ALMACÉN** 
+        una vez producidos para que sean contabilizados en el sistema de inventario.
+        """)
+        
         st.markdown("### Los siguientes contenedores deben producirse:")
         st.markdown("---")
         
