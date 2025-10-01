@@ -520,13 +520,34 @@ def main():
             help="Selecciona el tipo de familia"
         )
         
+        # Actualizar URL params inmediatamente cuando hay cambios
+        current_url_cell = query_params.get("selected_cell")
+        current_url_family = query_params.get("selected_family")
+        
+        if selected_cell != current_url_cell or selected_family != current_url_family:
+            st.query_params.update({
+                "selected_cell": selected_cell,
+                "selected_family": selected_family
+            })
+            
+            # Forzar actualización de URL en el navegador usando JavaScript
+            new_url = f"?refresh_enabled={query_params.get('refresh_enabled', 'true')}&refresh_interval={query_params.get('refresh_interval', '60')}&selected_cell={selected_cell}&selected_family={selected_family}"
+            st.markdown(f"""
+            <script>
+                // Actualizar URL del navegador sin recargar la página
+                window.history.replaceState(null, null, "{new_url}");
+            </script>
+            """, unsafe_allow_html=True)
+        
         # Debug temporal - mostrar valores actuales
         st.sidebar.write("🔍 **Debug Info:**")
         st.sidebar.write(f"Session Cell: {st.session_state.get('cell_selection', 'No definido')}")
         st.sidebar.write(f"Selected Cell: {selected_cell}")
+        st.sidebar.write(f"URL Cell: {current_url_cell}")
         st.sidebar.write("---")
         st.sidebar.write(f"Session Family: {st.session_state.get('family_selection', 'No definido')}")
         st.sidebar.write(f"Selected Family: {selected_family}")
+        st.sidebar.write(f"URL Family: {current_url_family}")
         st.sidebar.write("---")
         st.sidebar.write(f"Default Cell Index: {default_cell_index}")
         st.sidebar.write(f"Default Family Index: {default_family_index}")
