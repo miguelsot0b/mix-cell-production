@@ -303,7 +303,7 @@ def main():
     next_update, minutes_until = get_next_update_time()
     
     st.sidebar.info(f"• Actualiza a los minutos :05 y :35 de cada hora\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
-    st.sidebar.success(f"🕐 Próxima actualización: {next_update.strftime('%H:%M')} (en {minutes_until} min)")
+    st.sidebar.success(f"🕐 Próxima actualización: en {minutes_until} minutos")
     
     # Auto-refresh setup
     if 'last_refresh_time' not in st.session_state:
