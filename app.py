@@ -470,53 +470,58 @@ def main():
     with st.sidebar:
         st.header("🏭 Selección de Producción")
         
+        # Obtener parámetros de URL actuales
+        query_params = st.query_params
+        
         # Dropdown 1: Cell Name (sin repetir)
         cell_names = sorted(parts_df['cell_name'].unique().tolist())
         
-        # Inicializar valores en session_state solo la primera vez
-        if "selected_cell" not in st.session_state:
-            if query_params.get("selected_cell") and query_params.get("selected_cell") in cell_names:
-                st.session_state.selected_cell = query_params.get("selected_cell")
-            else:
-                st.session_state.selected_cell = cell_names[0]
+        # Determinar valor inicial para celda
+        if query_params.get("selected_cell") and query_params.get("selected_cell") in cell_names:
+            initial_cell = query_params.get("selected_cell")
+        else:
+            initial_cell = cell_names[0]
                 
         selected_cell = st.selectbox(
             "📍 Celda:",
             options=cell_names,
-            index=cell_names.index(st.session_state.selected_cell),
-            key="selected_cell_dropdown",
-            help="Selecciona la celda de producción",
-            on_change=lambda: setattr(st.session_state, 'selected_cell', st.session_state.selected_cell_dropdown)
+            index=cell_names.index(initial_cell),
+            key="cell_selection",
+            help="Selecciona la celda de producción"
         )
         
         # Dropdown 2: Family (tipos de familia)
         families = sorted(parts_df['family'].unique().tolist())
         
-        # Inicializar valores en session_state solo la primera vez
-        if "selected_family" not in st.session_state:
-            if query_params.get("selected_family") and query_params.get("selected_family") in families:
-                st.session_state.selected_family = query_params.get("selected_family")
-            else:
-                st.session_state.selected_family = families[0]
+        # Determinar valor inicial para familia
+        if query_params.get("selected_family") and query_params.get("selected_family") in families:
+            initial_family = query_params.get("selected_family")
+        else:
+            initial_family = families[0]
                 
         selected_family = st.selectbox(
             "🎯 Familia:",
             options=families,
-            index=families.index(st.session_state.selected_family),
-            key="selected_family_dropdown",
-            help="Selecciona el tipo de familia",
-            on_change=lambda: setattr(st.session_state, 'selected_family', st.session_state.selected_family_dropdown)
+            index=families.index(initial_family),
+            key="family_selection",
+            help="Selecciona el tipo de familia"
         )
         
-        # Actualizar session_state con valores actuales de los widgets
-        st.session_state.selected_cell = selected_cell
-        st.session_state.selected_family = selected_family
+        # Actualizar URL params inmediatamente cuando hay cambio
+        if selected_cell != query_params.get("selected_cell") or selected_family != query_params.get("selected_family"):
+            st.query_params.update({
+                "selected_cell": selected_cell,
+                "selected_family": selected_family
+            })
+            st.rerun()
         
-        # Actualizar URL params con los valores actuales
-        st.query_params.update({
-            "selected_cell": selected_cell,
-            "selected_family": selected_family
-        })
+        # Debug temporal - mostrar valores actuales
+        st.sidebar.write("🔍 **Debug Info:**")
+        st.sidebar.write(f"URL Cell: {query_params.get('selected_cell', 'No definido')}")
+        st.sidebar.write(f"Selected Cell: {selected_cell}")
+        st.sidebar.write("---")
+        st.sidebar.write(f"URL Family: {query_params.get('selected_family', 'No definido')}")
+        st.sidebar.write(f"Selected Family: {selected_family}")
 
     # Filtrar por la celda y familia seleccionadas
     filtered_parts = parts_df[
