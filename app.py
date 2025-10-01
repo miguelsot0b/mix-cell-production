@@ -470,22 +470,27 @@ def main():
     with st.sidebar:
         st.header("🏭 Selección de Producción")
         
-        # Obtener parámetros de URL actuales
-        query_params = st.query_params
-        
         # Dropdown 1: Cell Name (sin repetir)
         cell_names = sorted(parts_df['cell_name'].unique().tolist())
         
-        # Determinar valor inicial para celda
-        if query_params.get("selected_cell") and query_params.get("selected_cell") in cell_names:
-            initial_cell = query_params.get("selected_cell")
+        # Solo usar query params como último recurso si no hay nada en session_state
+        if "cell_selection" not in st.session_state:
+            query_params = st.query_params
+            if query_params.get("selected_cell") and query_params.get("selected_cell") in cell_names:
+                default_cell_index = cell_names.index(query_params.get("selected_cell"))
+            else:
+                default_cell_index = 0
         else:
-            initial_cell = cell_names[0]
+            # Si ya existe en session_state, usar ese valor
+            try:
+                default_cell_index = cell_names.index(st.session_state.cell_selection)
+            except (ValueError, KeyError):
+                default_cell_index = 0
                 
         selected_cell = st.selectbox(
             "📍 Celda:",
             options=cell_names,
-            index=cell_names.index(initial_cell),
+            index=default_cell_index,
             key="cell_selection",
             help="Selecciona la celda de producción"
         )
@@ -493,35 +498,38 @@ def main():
         # Dropdown 2: Family (tipos de familia)
         families = sorted(parts_df['family'].unique().tolist())
         
-        # Determinar valor inicial para familia
-        if query_params.get("selected_family") and query_params.get("selected_family") in families:
-            initial_family = query_params.get("selected_family")
+        # Solo usar query params como último recurso si no hay nada en session_state
+        if "family_selection" not in st.session_state:
+            query_params = st.query_params
+            if query_params.get("selected_family") and query_params.get("selected_family") in families:
+                default_family_index = families.index(query_params.get("selected_family"))
+            else:
+                default_family_index = 0
         else:
-            initial_family = families[0]
+            # Si ya existe en session_state, usar ese valor
+            try:
+                default_family_index = families.index(st.session_state.family_selection)
+            except (ValueError, KeyError):
+                default_family_index = 0
                 
         selected_family = st.selectbox(
             "🎯 Familia:",
             options=families,
-            index=families.index(initial_family),
+            index=default_family_index,
             key="family_selection",
             help="Selecciona el tipo de familia"
         )
         
-        # Actualizar URL params inmediatamente cuando hay cambio
-        if selected_cell != query_params.get("selected_cell") or selected_family != query_params.get("selected_family"):
-            st.query_params.update({
-                "selected_cell": selected_cell,
-                "selected_family": selected_family
-            })
-            st.rerun()
-        
         # Debug temporal - mostrar valores actuales
         st.sidebar.write("🔍 **Debug Info:**")
-        st.sidebar.write(f"URL Cell: {query_params.get('selected_cell', 'No definido')}")
+        st.sidebar.write(f"Session Cell: {st.session_state.get('cell_selection', 'No definido')}")
         st.sidebar.write(f"Selected Cell: {selected_cell}")
         st.sidebar.write("---")
-        st.sidebar.write(f"URL Family: {query_params.get('selected_family', 'No definido')}")
+        st.sidebar.write(f"Session Family: {st.session_state.get('family_selection', 'No definido')}")
         st.sidebar.write(f"Selected Family: {selected_family}")
+        st.sidebar.write("---")
+        st.sidebar.write(f"Default Cell Index: {default_cell_index}")
+        st.sidebar.write(f"Default Family Index: {default_family_index}")
 
     # Filtrar por la celda y familia seleccionadas
     filtered_parts = parts_df[
