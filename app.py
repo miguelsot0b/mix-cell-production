@@ -329,12 +329,18 @@ def main():
     query_params = st.query_params
     url_refresh_enabled = query_params.get("refresh_enabled", "true").lower() == "true"
     url_refresh_interval = int(query_params.get("refresh_interval", "300"))
+    url_selected_cell = query_params.get("selected_cell", "")
+    url_selected_family = query_params.get("selected_family", "")
     
     # Inicializar configuración con valores de URL o defaults
     if 'auto_refresh_enabled' not in st.session_state:
         st.session_state.auto_refresh_enabled = url_refresh_enabled
     if 'refresh_interval' not in st.session_state:
         st.session_state.refresh_interval = url_refresh_interval
+    if 'selected_cell' not in st.session_state:
+        st.session_state.selected_cell = url_selected_cell
+    if 'selected_family' not in st.session_state:
+        st.session_state.selected_family = url_selected_family
     
     auto_refresh_enabled = st.sidebar.checkbox(
         "🔄 Auto-refresh página", 
@@ -366,34 +372,26 @@ def main():
         # Actualizar session_state con la nueva selección
         st.session_state.refresh_interval = refresh_interval
         
-        # Actualizar URL params para persistencia (mantener selecciones actuales)
-        current_params = st.query_params
+        # Actualizar URL params para persistencia (usar session_state como fuente)
         update_params = {
             "refresh_enabled": "true",
-            "refresh_interval": str(refresh_interval)
+            "refresh_interval": str(refresh_interval),
+            "selected_cell": st.session_state.selected_cell,
+            "selected_family": st.session_state.selected_family
         }
-        # Mantener selecciones actuales si existen
-        if current_params.get("selected_cell"):
-            update_params["selected_cell"] = current_params.get("selected_cell")
-        if current_params.get("selected_family"):
-            update_params["selected_family"] = current_params.get("selected_family")
         st.query_params.update(update_params)
         
         # Activar auto-refresh HTML
         add_auto_refresh(refresh_interval)
     else:
         refresh_interval = 0  # Deshabilitado
-        # Actualizar URL params (mantener selecciones actuales)
-        current_params = st.query_params
+        # Actualizar URL params (usar session_state como fuente)
         update_params = {
             "refresh_enabled": "false",
-            "refresh_interval": "300"
+            "refresh_interval": "300",
+            "selected_cell": st.session_state.selected_cell,
+            "selected_family": st.session_state.selected_family
         }
-        # Mantener selecciones actuales si existen
-        if current_params.get("selected_cell"):
-            update_params["selected_cell"] = current_params.get("selected_cell")
-        if current_params.get("selected_family"):
-            update_params["selected_family"] = current_params.get("selected_family")
         st.query_params.update(update_params)
     
     # Botón para forzar actualización de datos
@@ -484,16 +482,15 @@ def main():
     with st.sidebar:
         st.header("🏭 Selección de Producción")
         
-        # Obtener valores de URL para persistencia de selección
-        url_selected_cell = query_params.get("selected_cell", "")
-        url_selected_family = query_params.get("selected_family", "")
-        
         # Dropdown 1: Cell Name (sin repetir)
         cell_names = sorted(parts_df['cell_name'].unique().tolist())
         
-        # Determinar índice inicial basado en URL o default al primer elemento
+        # Determinar índice inicial basado en session_state o default al primer elemento
         try:
-            initial_cell_index = cell_names.index(url_selected_cell) if url_selected_cell in cell_names else 0
+            if st.session_state.selected_cell and st.session_state.selected_cell in cell_names:
+                initial_cell_index = cell_names.index(st.session_state.selected_cell)
+            else:
+                initial_cell_index = 0
         except (ValueError, IndexError):
             initial_cell_index = 0
             
@@ -507,9 +504,12 @@ def main():
         # Dropdown 2: Family (tipos de familia)
         families = sorted(parts_df['family'].unique().tolist())
         
-        # Determinar índice inicial basado en URL o default al primer elemento
+        # Determinar índice inicial basado en session_state o default al primer elemento
         try:
-            initial_family_index = families.index(url_selected_family) if url_selected_family in families else 0
+            if st.session_state.selected_family and st.session_state.selected_family in families:
+                initial_family_index = families.index(st.session_state.selected_family)
+            else:
+                initial_family_index = 0
         except (ValueError, IndexError):
             initial_family_index = 0
             
@@ -520,10 +520,11 @@ def main():
             help="Selecciona el tipo de familia"
         )
         
-        # Actualizar URL params para persistencia (solo si cambió la selección)
-        current_params = st.query_params
-        if (current_params.get("selected_cell") != selected_cell or 
-            current_params.get("selected_family") != selected_family):
+        # Actualizar session_state y URL params si cambió la selección
+        if (st.session_state.selected_cell != selected_cell or 
+            st.session_state.selected_family != selected_family):
+            st.session_state.selected_cell = selected_cell
+            st.session_state.selected_family = selected_family
             st.query_params.update({
                 "selected_cell": selected_cell,
                 "selected_family": selected_family
