@@ -200,8 +200,18 @@ def load_data():
         parts_df = pd.read_csv(PARTS_FILE_PATH)
         prp_df = pd.read_csv(PRP_FILE_PATH)
         
-        # Mostrar información de última actualización
-        if os.path.exists(PRP_FILE_PATH):
+        # Mostrar información de última actualización desde el CSV
+        if not prp_df.empty and 'Fecha De Actualizacion' in prp_df.columns:
+            # Obtener la fecha de actualización del PRP (todas las filas tienen la misma fecha)
+            fecha_actualizacion = prp_df['Fecha De Actualizacion'].iloc[0]
+            try:
+                # Convertir a datetime para mejor formato
+                fecha_dt = pd.to_datetime(fecha_actualizacion)
+                st.sidebar.info(f"📅 Última actualización PRP: {fecha_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+            except:
+                st.sidebar.info(f"📅 Última actualización PRP: {fecha_actualizacion}")
+        elif os.path.exists(PRP_FILE_PATH):
+            # Fallback a fecha de modificación del archivo si no hay columna
             last_modified = datetime.fromtimestamp(os.path.getmtime(PRP_FILE_PATH))
             st.sidebar.info(f"{MESSAGES['last_update']}{last_modified.strftime('%Y-%m-%d %H:%M:%S')}")
         
@@ -247,6 +257,15 @@ def main():
         if parts_df.empty or prp_df.empty:
             st.error("❌ No se pudieron cargar los datos necesarios")
             return
+        
+        # Mostrar información de actualización prominente
+        if not prp_df.empty and 'Fecha De Actualizacion' in prp_df.columns:
+            fecha_actualizacion = prp_df['Fecha De Actualizacion'].iloc[0]
+            try:
+                fecha_dt = pd.to_datetime(fecha_actualizacion)
+                st.info(f"📡 **Datos actualizados desde Google Drive**: {fecha_dt.strftime('%Y-%m-%d a las %H:%M:%S')}")
+            except:
+                st.info(f"📡 **Datos actualizados desde Google Drive**: {fecha_actualizacion}")
         
         # Verificar que existen las columnas requeridas
         required_parts_cols = ['cell_name', 'part_numbers', 'pieces_per_container', 'family']
