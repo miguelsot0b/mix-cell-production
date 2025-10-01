@@ -306,6 +306,21 @@ def main():
     # Sidebar con controles
     st.sidebar.header("🔧 Controles")
     
+    # Configuración de auto-refresh
+    st.sidebar.markdown("### ⚙️ Configuración")
+    auto_refresh_enabled = st.sidebar.checkbox("🔄 Auto-refresh página", value=True, help="Refresca la página automáticamente cada 5 minutos")
+    
+    if auto_refresh_enabled:
+        refresh_interval = st.sidebar.selectbox(
+            "⏱️ Intervalo de refresh:",
+            options=[300, 600, 900],  # 5, 10, 15 minutos en segundos
+            format_func=lambda x: f"{x//60} minutos",
+            index=0,  # Default 5 minutos
+            help="Cada cuánto tiempo se refresca automáticamente la página"
+        )
+    else:
+        refresh_interval = 0  # Deshabilitado
+    
     # Botón para forzar actualización de datos
     if st.sidebar.button("🔄 Actualizar Datos Ahora"):
         with st.spinner("Actualizando datos..."):
@@ -323,6 +338,11 @@ def main():
     st.sidebar.markdown("### 📡 Sistema de Actualización")
     
     st.sidebar.info(f"• Actualiza a los minutos :05 y :35 de cada hora\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
+    
+    # Mostrar información de auto-refresh si está habilitado
+    if auto_refresh_enabled and refresh_interval > 0:
+        refresh_minutes = refresh_interval // 60
+        st.sidebar.info(f"🔄 Auto-refresh: Página se refresca cada {refresh_minutes} minutos")
     
     # Calcular próxima actualización
     next_update, minutes_until, seconds_until, total_seconds = get_next_update_time()
@@ -344,11 +364,16 @@ def main():
     
     <script>
     let totalSeconds = {int(total_seconds)};
+    const autoRefreshInterval = {refresh_interval * 1000}; // Convertir a milisegundos
+    const autoRefreshEnabled = {str(auto_refresh_enabled).lower()};
     
     function updateCountdown() {{
         if (totalSeconds <= 0) {{
             document.getElementById('countdown-text').textContent = 'Actualizando...';
-            setTimeout(() => {{ location.reload(); }}, 1000);
+            // Recargar página después de 3 segundos
+            setTimeout(() => {{ 
+                location.reload(); 
+            }}, 3000);
             return;
         }}
         
@@ -372,9 +397,21 @@ def main():
     updateCountdown();
     const countdownInterval = setInterval(updateCountdown, 1000);
     
-    // Limpiar intervalo si el componente se desmonta
+    // Auto-refresh de página si está habilitado
+    let autoRefreshTimer;
+    if (autoRefreshEnabled && autoRefreshInterval > 0) {{
+        autoRefreshTimer = setTimeout(() => {{
+            console.log('Auto-refresh: Recargando página...');
+            location.reload();
+        }}, autoRefreshInterval);
+    }}
+    
+    // Limpiar intervalos si el componente se desmonta
     window.addEventListener('beforeunload', () => {{
         clearInterval(countdownInterval);
+        if (autoRefreshTimer) {{
+            clearTimeout(autoRefreshTimer);
+        }}
     }});
     </script>
     """
