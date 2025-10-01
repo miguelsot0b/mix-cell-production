@@ -4,6 +4,53 @@ import numpy as np
 import math
 from datetime import datetime
 import time
+import gdown
+import os
+import requests
+from config import *
+
+# Configuración de Google Drive se importa desde config.py
+
+def download_from_google_drive(file_id, output_path):
+    """Descarga un archivo desde Google Drive usando su ID"""
+    try:
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, output_path, quiet=False)
+        return True
+    except Exception as e:
+        st.error(f"{MESSAGES['error_loading']}{e}")
+        return False
+
+def check_file_age(file_path, max_age_seconds=AUTO_UPDATE_INTERVAL):
+    """Verifica si un archivo necesita actualizarse basado en su edad"""
+    if not os.path.exists(file_path):
+        return True  # Archivo no existe, necesita descarga
+    
+    file_age = time.time() - os.path.getmtime(file_path)
+    return file_age > max_age_seconds
+
+def update_prp_file():
+    """Actualiza el archivo PRP desde Google Drive si es necesario"""
+    
+    # Verificar si necesita actualización
+    if check_file_age(PRP_FILE_PATH):
+        st.info(MESSAGES['updating'])
+        
+        # Crear directorio si no existe
+        os.makedirs(DATA_FOLDER, exist_ok=True)
+        
+        # Intentar descargar desde Google Drive
+        if GOOGLE_DRIVE_PRP_ID != "TU_ID_DEL_ARCHIVO_AQUI":
+            success = download_from_google_drive(GOOGLE_DRIVE_PRP_ID, PRP_FILE_PATH)
+            if success:
+                st.success(MESSAGES['updated'])
+                return True
+            else:
+                st.warning(MESSAGES['update_failed'])
+        else:
+            st.warning(MESSAGES['no_id'])
+    
+    return os.path.exists(PRP_FILE_PATH)
 
 # Configuración de la página
 st.set_page_config(
@@ -141,22 +188,48 @@ def get_visual_color(parts_df, part_number):
         pass
     return '#E8E8E8'  # Gris claro por defecto
 
-# Cache para datos con auto-refresh cada 10 minutos
-@st.cache_data(ttl=600)
+# Cache para datos con auto-refresh inteligente
+@st.cache_data(ttl=CACHE_TTL)  # Cache basado en configuración
 def load_data():
-    """Carga los datos desde archivos CSV"""
+    """Carga los datos desde archivos CSV con actualización automática desde Google Drive"""
     try:
-        parts_df = pd.read_csv("data/parts_data.csv")
-        prp_df = pd.read_csv("data/prp.csv")
+        # Actualizar archivo PRP desde Google Drive si es necesario
+        update_prp_file()
+        
+        # Cargar datos
+        parts_df = pd.read_csv(PARTS_FILE_PATH)
+        prp_df = pd.read_csv(PRP_FILE_PATH)
+        
+        # Mostrar información de última actualización
+        if os.path.exists(PRP_FILE_PATH):
+            last_modified = datetime.fromtimestamp(os.path.getmtime(PRP_FILE_PATH))
+            st.sidebar.info(f"{MESSAGES['last_update']}{last_modified.strftime('%Y-%m-%d %H:%M:%S')}")
+        
         return parts_df, prp_df
     except FileNotFoundError as e:
-        st.error(f"❌ No se encontró el archivo: {str(e)}")
+        st.error(f"{MESSAGES['file_not_found']}{str(e)}")
         return pd.DataFrame(), pd.DataFrame()
     except Exception as e:
-        st.error(f"❌ Error al cargar datos: {str(e)}")
+        st.error(f"{MESSAGES['error_loading']}{str(e)}")
         return pd.DataFrame(), pd.DataFrame()
 
 def main():
+    # Sidebar con controles
+    st.sidebar.header("🔧 Controles")
+    
+    # Botón para forzar actualización de datos
+    if st.sidebar.button("🔄 Actualizar Datos Ahora"):
+        # Limpiar cache
+        st.cache_data.clear()
+        # Forzar descarga desde Google Drive
+        if os.path.exists(PRP_FILE_PATH):
+            os.remove(PRP_FILE_PATH)  # Eliminar archivo local para forzar descarga
+        st.rerun()
+    
+    # Información del sistema de actualización
+    st.sidebar.markdown("### 📡 Sistema de Actualización")
+    st.sidebar.info("• Verifica cada 30 minutos si hay nuevos datos\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
+    
     # Auto-refresh setup
     if 'last_refresh_time' not in st.session_state:
         st.session_state.last_refresh_time = time.time()
