@@ -312,18 +312,45 @@ def main():
     # Sidebar con controles
     st.sidebar.header("🔧 Controles")
     
-    # Configuración de auto-refresh
+    # Configuración de auto-refresh con persistencia
     st.sidebar.markdown("### ⚙️ Configuración")
-    auto_refresh_enabled = st.sidebar.checkbox("🔄 Auto-refresh página", value=True, help="Refresca la página automáticamente")
+    
+    # Inicializar configuración en session_state si no existe
+    if 'auto_refresh_enabled' not in st.session_state:
+        st.session_state.auto_refresh_enabled = True
+    if 'refresh_interval' not in st.session_state:
+        st.session_state.refresh_interval = 300  # Default 5 minutos
+    
+    auto_refresh_enabled = st.sidebar.checkbox(
+        "🔄 Auto-refresh página", 
+        value=st.session_state.auto_refresh_enabled,
+        key="auto_refresh_checkbox",
+        help="Refresca la página automáticamente"
+    )
+    
+    # Actualizar session_state
+    st.session_state.auto_refresh_enabled = auto_refresh_enabled
     
     if auto_refresh_enabled:
+        # Encontrar el índice actual basado en el valor guardado
+        options = [60, 300, 600, 900]  # 1, 5, 10, 15 minutos en segundos
+        try:
+            current_index = options.index(st.session_state.refresh_interval)
+        except ValueError:
+            current_index = 1  # Default a 5 minutos si no se encuentra
+        
         refresh_interval = st.sidebar.selectbox(
             "⏱️ Intervalo de refresh:",
-            options=[60, 300, 600, 900],  # 1, 5, 10, 15 minutos en segundos
+            options=options,
             format_func=lambda x: f"{x//60} minutos" if x >= 60 else f"{x} segundos",
-            index=1,  # Default 5 minutos (index 1)
+            index=current_index,
+            key="refresh_interval_select",
             help="Cada cuánto tiempo se refresca automáticamente la página"
         )
+        
+        # Actualizar session_state con la nueva selección
+        st.session_state.refresh_interval = refresh_interval
+        
         # Activar auto-refresh HTML
         add_auto_refresh(refresh_interval)
     else:
