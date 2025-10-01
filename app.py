@@ -12,15 +12,7 @@ from config import *
 # Configuración de Google Drive se importa desde config.py
 
 def download_from_google_drive(file_id, output_path):
-    """Descarga un archivo desd    function updateCountdown() {
-        if (totalSeconds <= 0) {
-            document.getElementById('countdown-text').textContent = 'Actualizando...';
-            // Recargar página después de 3 segundos
-            setTimeout(() => { 
-                location.reload(); 
-            }, 3000);
-            return;
-        }le Drive usando su ID"""
+    """Descarga un archivo desde Google Drive usando su ID"""
     try:
         url = f"https://drive.google.com/uc?id={file_id}"
         gdown.download(url, output_path, quiet=False)
@@ -337,76 +329,43 @@ def main():
     # Calcular próxima actualización
     next_update, minutes_until, seconds_until, total_seconds = get_next_update_time()
     
-    # Crear contador dinámico con JavaScript
-    countdown_html = f"""
-    <div id="countdown-container" style="
-        background-color: #d4edda; 
-        border: 1px solid #c3e6cb; 
-        border-radius: 0.25rem; 
-        padding: 0.75rem; 
-        margin: 0.5rem 0;
-        color: #155724;
-        font-weight: 500;
-    ">
-        <span style="margin-right: 0.5rem;">🕐</span>
-        <span id="countdown-text">Próxima actualización: en {minutes_until} minutos</span>
-    </div>
+    # Crear contador dinámico que se actualiza automáticamente
+    countdown_message = format_countdown_message(minutes_until, seconds_until)
     
-    <script>
-    let totalSeconds = {int(total_seconds)};
-    const autoRefreshInterval = {refresh_interval * 1000}; // Convertir a milisegundos
-    const autoRefreshEnabled = {str(auto_refresh_enabled).lower()};
+    # Mostrar contador en sidebar con colores según urgencia
+    if total_seconds <= 60:  # Último minuto - rojo
+        st.sidebar.error(countdown_message)
+    elif total_seconds <= 180:  # Últimos 3 minutos - amarillo
+        st.sidebar.warning(countdown_message)
+    else:  # Normal - verde
+        st.sidebar.success(countdown_message)
     
-    function updateCountdown() {{
-        if (totalSeconds <= 0) {{
-            document.getElementById('countdown-text').textContent = 'Actualizando...';
-            // Recargar página después de 3 segundos
-            setTimeout(() => {{ 
-                location.reload(); 
-            }}, 3000);
-            return;
-        }}
-        
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        
-        let message;
-        if (minutes >= 3) {{
-            message = `Próxima actualización: en ${{minutes}} minutos`;
-        }} else if (minutes > 0) {{
-            message = `Próxima actualización: en ${{minutes}} minutos y ${{seconds}} segundos`;
-        }} else {{
-            message = `Próxima actualización: en ${{seconds}} segundos`;
-        }}
-        
-        document.getElementById('countdown-text').textContent = message;
-        totalSeconds--;
-    }}
+    # Auto-refresh: Configurar próximo refresh automático
+    current_time = time.time()
     
-    // Actualizar inmediatamente y luego cada segundo
-    updateCountdown();
-    const countdownInterval = setInterval(updateCountdown, 1000);
+    # Inicializar timers si no existen
+    if 'app_start_time' not in st.session_state:
+        st.session_state.app_start_time = current_time
+        st.session_state.last_countdown_refresh = current_time
+        st.session_state.last_page_refresh = current_time
     
-    // Auto-refresh de página si está habilitado
-    let autoRefreshTimer;
-    if (autoRefreshEnabled && autoRefreshInterval > 0) {{
-        autoRefreshTimer = setTimeout(() => {{
-            console.log('Auto-refresh: Recargando página...');
-            location.reload();
-        }}, autoRefreshInterval);
-    }}
+    # Refresh del contador cada segundo cuando faltan menos de 5 minutos
+    time_since_countdown = current_time - st.session_state.last_countdown_refresh
+    if total_seconds <= 300 and time_since_countdown >= 1:  # Cada segundo si faltan menos de 5 min
+        st.session_state.last_countdown_refresh = current_time
+        time.sleep(0.1)  # Pequeña pausa para evitar loops muy rápidos
+        st.rerun()
+    elif total_seconds > 300 and time_since_countdown >= 30:  # Cada 30 segundos si falta más de 5 min
+        st.session_state.last_countdown_refresh = current_time
+        st.rerun()
     
-    // Limpiar intervalos si el componente se desmonta
-    window.addEventListener('beforeunload', () => {{
-        clearInterval(countdownInterval);
-        if (autoRefreshTimer) {{
-            clearTimeout(autoRefreshTimer);
-        }}
-    }});
-    </script>
-    """
-    
-    st.sidebar.markdown(countdown_html, unsafe_allow_html=True)
+    # Auto-refresh de página si está habilitado
+    if auto_refresh_enabled and refresh_interval > 0:
+        time_since_page_refresh = current_time - st.session_state.last_page_refresh
+        if time_since_page_refresh >= refresh_interval:
+            st.session_state.last_page_refresh = current_time
+            st.cache_data.clear()  # Limpiar cache al hacer refresh
+            st.rerun()
     
     # Verificar si se está forzando una actualización desde URL o si es hora de actualizar
     now = datetime.now()
