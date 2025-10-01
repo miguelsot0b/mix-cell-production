@@ -21,13 +21,57 @@ def download_from_google_drive(file_id, output_path):
         st.error(f"{MESSAGES['error_loading']}{e}")
         return False
 
-def check_file_age(file_path, max_age_seconds=AUTO_UPDATE_INTERVAL):
-    """Verifica si un archivo necesita actualizarse basado en su edad"""
+def get_next_update_time():
+    """Calcula cuándo será la próxima actualización programada"""
+    now = datetime.now()
+    current_minute = now.minute
+    
+    if current_minute < 5:
+        # Próxima actualización a los :05 de esta hora
+        next_update = now.replace(minute=5, second=0, microsecond=0)
+    elif current_minute < 35:
+        # Próxima actualización a los :35 de esta hora
+        next_update = now.replace(minute=35, second=0, microsecond=0)
+    else:
+        # Próxima actualización a los :05 de la siguiente hora
+        if now.hour == 23:
+            next_update = now.replace(hour=0, minute=5, second=0, microsecond=0) + pd.Timedelta(days=1)
+        else:
+            next_update = now.replace(hour=now.hour+1, minute=5, second=0, microsecond=0)
+    
+    minutes_until = int((next_update - now).total_seconds() / 60)
+    return next_update, minutes_until
+
+def check_file_age(file_path, max_age_seconds=None):
+    """Verifica si un archivo necesita actualizarse basado en horarios específicos (minuto 5 y 35 de cada hora)"""
     if not os.path.exists(file_path):
         return True  # Archivo no existe, necesita descarga
     
-    file_age = time.time() - os.path.getmtime(file_path)
-    return file_age > max_age_seconds
+    # Obtener tiempo actual
+    now = datetime.now()
+    current_minute = now.minute
+    
+    # Obtener última modificación del archivo
+    last_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
+    
+    # Determinar si estamos en una ventana de actualización (minuto 5 o 35)
+    is_update_window = current_minute == 5 or current_minute == 35
+    
+    if not is_update_window:
+        return False  # No estamos en ventana de actualización
+    
+    # Si estamos en ventana de actualización, verificar si ya se actualizó en esta ventana
+    # Calcular la ventana actual (hora + minuto específico)
+    if current_minute == 5:
+        current_window = now.replace(minute=5, second=0, microsecond=0)
+    else:  # current_minute == 35
+        current_window = now.replace(minute=35, second=0, microsecond=0)
+    
+    # Si el archivo fue modificado después del inicio de la ventana actual, no actualizar
+    if last_modified >= current_window:
+        return False
+    
+    return True  # Necesita actualización
 
 def update_prp_file():
     """Actualiza el archivo PRP desde Google Drive si es necesario"""
@@ -238,7 +282,12 @@ def main():
     
     # Información del sistema de actualización
     st.sidebar.markdown("### 📡 Sistema de Actualización")
-    st.sidebar.info("• Verifica cada 30 minutos si hay nuevos datos\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
+    
+    # Calcular próxima actualización
+    next_update, minutes_until = get_next_update_time()
+    
+    st.sidebar.info(f"• Actualiza a los minutos :05 y :35 de cada hora\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
+    st.sidebar.success(f"🕐 Próxima actualización: {next_update.strftime('%H:%M')} (en {minutes_until} min)")
     
     # Auto-refresh setup
     if 'last_refresh_time' not in st.session_state:

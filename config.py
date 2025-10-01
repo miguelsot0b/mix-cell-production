@@ -11,7 +11,11 @@
 GOOGLE_DRIVE_PRP_ID = "1TxKmxwy8QnUnTQTee77LgyooR_Fq1AGu"
 
 # Configuración de actualización
-AUTO_UPDATE_INTERVAL = 1800  # 30 minutos en segundos
+# La aplicación verifica Google Drive en horarios específicos:
+# - Minuto 05 de cada hora (10:05, 11:05, 12:05, etc.)
+# - Minuto 35 de cada hora (10:35, 11:35, 12:35, etc.)
+# Esto garantiza actualizaciones regulares cada 30 minutos en horarios predecibles
+AUTO_UPDATE_INTERVAL = 1800  # 30 minutos en segundos (mantenido para compatibilidad)
 CACHE_TTL = 300  # 5 minutos para el cache de Streamlit
 
 # Configuración de archivos
@@ -27,5 +31,6 @@ MESSAGES = {
     "no_id": "⚠️ ID de Google Drive no configurado, usando datos locales",
     "last_update": "📅 Última actualización: ",
     "file_not_found": "❌ No se encontró el archivo: ",
-    "error_loading": "❌ Error al cargar datos: "
+    "error_loading": "❌ Error al cargar datos: ",
+    "schedule_info": "🕐 Próximas actualizaciones programadas a los minutos :05 y :35 de cada hora"
 }
