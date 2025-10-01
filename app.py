@@ -334,16 +334,6 @@ def main():
                 del st.session_state.data_timestamp
         st.rerun()
     
-    # Información del sistema de actualización
-    st.sidebar.markdown("### 📡 Sistema de Actualización")
-    
-    st.sidebar.info(f"• Actualiza a los minutos :05 y :35 de cada hora\n• Descarga automáticamente desde Google Drive\n• Usa archivo local como respaldo")
-    
-    # Mostrar información de auto-refresh si está habilitado
-    if auto_refresh_enabled and refresh_interval > 0:
-        refresh_minutes = refresh_interval // 60
-        st.sidebar.info(f"🔄 Auto-refresh: Página se refresca cada {refresh_minutes} minutos")
-    
     # Calcular próxima actualización
     next_update, minutes_until, seconds_until, total_seconds = get_next_update_time()
     
