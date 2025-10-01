@@ -129,6 +129,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Función para agregar auto-refresh HTML
+def add_auto_refresh(interval_seconds):
+    """Agrega meta refresh para auto-actualización de página"""
+    refresh_html = f"""
+    <meta http-equiv="refresh" content="{interval_seconds}">
+    <script>
+        // Auto-refresh adicional con JavaScript como backup
+        setTimeout(function(){{
+            window.location.reload();
+        }}, {interval_seconds * 1000});
+    </script>
+    """
+    st.markdown(refresh_html, unsafe_allow_html=True)
+
 # Título principal
 st.title("🏭 Sistema de Planificación de Producción MIX")
 st.markdown("---")
@@ -300,16 +314,18 @@ def main():
     
     # Configuración de auto-refresh
     st.sidebar.markdown("### ⚙️ Configuración")
-    auto_refresh_enabled = st.sidebar.checkbox("🔄 Auto-refresh página", value=True, help="Refresca la página automáticamente cada 5 minutos")
+    auto_refresh_enabled = st.sidebar.checkbox("🔄 Auto-refresh página", value=True, help="Refresca la página automáticamente")
     
     if auto_refresh_enabled:
         refresh_interval = st.sidebar.selectbox(
             "⏱️ Intervalo de refresh:",
-            options=[300, 600, 900],  # 5, 10, 15 minutos en segundos
-            format_func=lambda x: f"{x//60} minutos",
-            index=0,  # Default 5 minutos
+            options=[60, 300, 600, 900],  # 1, 5, 10, 15 minutos en segundos
+            format_func=lambda x: f"{x//60} minutos" if x >= 60 else f"{x} segundos",
+            index=1,  # Default 5 minutos (index 1)
             help="Cada cuánto tiempo se refresca automáticamente la página"
         )
+        # Activar auto-refresh HTML
+        add_auto_refresh(refresh_interval)
     else:
         refresh_interval = 0  # Deshabilitado
     
@@ -340,34 +356,7 @@ def main():
     else:  # Normal - verde
         st.sidebar.success(countdown_message)
     
-    # Auto-refresh: Configurar próximo refresh automático
-    current_time = time.time()
-    
-    # Inicializar timers si no existen
-    if 'app_start_time' not in st.session_state:
-        st.session_state.app_start_time = current_time
-        st.session_state.last_countdown_refresh = current_time
-        st.session_state.last_page_refresh = current_time
-    
-    # Refresh del contador cada segundo cuando faltan menos de 5 minutos
-    time_since_countdown = current_time - st.session_state.last_countdown_refresh
-    if total_seconds <= 300 and time_since_countdown >= 1:  # Cada segundo si faltan menos de 5 min
-        st.session_state.last_countdown_refresh = current_time
-        time.sleep(0.1)  # Pequeña pausa para evitar loops muy rápidos
-        st.rerun()
-    elif total_seconds > 300 and time_since_countdown >= 30:  # Cada 30 segundos si falta más de 5 min
-        st.session_state.last_countdown_refresh = current_time
-        st.rerun()
-    
-    # Auto-refresh de página si está habilitado
-    if auto_refresh_enabled and refresh_interval > 0:
-        time_since_page_refresh = current_time - st.session_state.last_page_refresh
-        if time_since_page_refresh >= refresh_interval:
-            st.session_state.last_page_refresh = current_time
-            st.cache_data.clear()  # Limpiar cache al hacer refresh
-            st.rerun()
-    
-    # Verificar si se está forzando una actualización desde URL o si es hora de actualizar
+    # Verificar si se está forzando una actualización automática
     now = datetime.now()
     current_minute = now.minute
     
@@ -387,17 +376,6 @@ def main():
         if os.path.exists(PRP_FILE_PATH):
             os.remove(PRP_FILE_PATH)  # Eliminar archivo local para forzar descarga
         st.session_state.last_forced_update = now.strftime('%H:%M')
-        st.rerun()
-    
-    # Auto-refresh setup
-    if 'last_refresh_time' not in st.session_state:
-        st.session_state.last_refresh_time = time.time()
-
-    current_time = time.time()
-    if current_time - st.session_state.last_refresh_time > 600:  # 10 minutos
-        st.session_state.last_refresh_time = current_time
-        st.cache_data.clear()
-        st.rerun()
 
     # Cargar y validar datos
     try:
