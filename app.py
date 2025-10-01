@@ -261,56 +261,19 @@ def main():
                 bg_color = get_visual_color(parts_df, part_number)
                 
                 with cols[i]:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, {bg_color} 0%, rgba(255,255,255,0.8) 100%); 
-                                padding: 25px; border-radius: 20px; margin: 10px 0; 
-                                border: 3px solid {bg_color}; 
-                                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); 
-                                text-align: center; position: relative;
-                                transform: scale(1); transition: transform 0.2s;">
+                    # Usar componentes nativos de Streamlit en lugar de HTML personalizado
+                    with st.container():
+                        # Badge de prioridad y título
+                        st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>PRIORIDAD #{i+1}</strong></div>", unsafe_allow_html=True)
                         
-                        <!-- Badge de prioridad -->
-                        <div style="position: absolute; top: -10px; left: 20px; 
-                                    background-color: #d73502; color: white; 
-                                    padding: 8px 16px; border-radius: 20px; 
-                                    font-weight: bold; font-size: 14px;
-                                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);">
-                            PRIORIDAD #{i+1}
-                        </div>
+                        # Número de parte con color de fondo
+                        st.markdown(f"<div style='background-color: {bg_color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 2px solid rgba(0,0,0,0.1);'><strong>{part_number}</strong></div>", unsafe_allow_html=True)
                         
-                        <!-- Número de parte con fondo del color -->
-                        <div style="background-color: {bg_color}; 
-                                    margin: 20px -10px 15px -10px; 
-                                    padding: 12px; border-radius: 10px;
-                                    border: 2px solid rgba(0,0,0,0.1);">
-                            <h4 style="margin: 0; color: #333; font-weight: bold; font-size: 16px;">
-                                {part_number}
-                            </h4>
-                        </div>
+                        # Número de contenedores grande
+                        st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
                         
-                        <!-- Contenedores - Número grande -->
-                        <div style="margin: 25px 0;">
-                            <div style="font-size: 64px; font-weight: 900; 
-                                        color: #d73502; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-                                        line-height: 1;">
-                                {containers}
-                            </div>
-                            <div style="font-size: 20px; color: #333; font-weight: bold; 
-                                        margin-top: 5px; text-transform: uppercase;">
-                                CONTENEDORES
-                            </div>
-                        </div>
-                        
-                        <!-- Información del faltante -->
-                        <div style="background-color: rgba(255,255,255,0.9); 
-                                    padding: 12px; border-radius: 10px; 
-                                    border-top: 3px solid #d73502; margin-top: 20px;">
-                            <strong style="color: #d73502; font-size: 16px;">
-                                Faltante: {deficit:,} piezas
-                            </strong>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        # Información del faltante
+                        st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
