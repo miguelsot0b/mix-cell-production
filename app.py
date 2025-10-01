@@ -525,19 +525,32 @@ def main():
         current_url_family = query_params.get("selected_family")
         
         if selected_cell != current_url_cell or selected_family != current_url_family:
-            st.query_params.update({
+            # Construir nueva URL con todos los parámetros
+            new_params = {
+                "refresh_enabled": query_params.get('refresh_enabled', 'true'),
+                "refresh_interval": query_params.get('refresh_interval', '60'),
                 "selected_cell": selected_cell,
                 "selected_family": selected_family
-            })
+            }
             
-            # Forzar actualización de URL en el navegador usando JavaScript
-            new_url = f"?refresh_enabled={query_params.get('refresh_enabled', 'true')}&refresh_interval={query_params.get('refresh_interval', '60')}&selected_cell={selected_cell}&selected_family={selected_family}"
+            # Actualizar query params de Streamlit
+            st.query_params.update(new_params)
+            
+            # Forzar navegación a la nueva URL (esto causa recarga pero sincroniza todo)
             st.markdown(f"""
             <script>
-                // Actualizar URL del navegador sin recargar la página
-                window.history.replaceState(null, null, "{new_url}");
+                // Redirigir inmediatamente a la nueva URL para sincronizar
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('refresh_enabled', '{new_params["refresh_enabled"]}');
+                newUrl.searchParams.set('refresh_interval', '{new_params["refresh_interval"]}');
+                newUrl.searchParams.set('selected_cell', '{selected_cell}');
+                newUrl.searchParams.set('selected_family', '{selected_family}');
+                window.location.href = newUrl.toString();
             </script>
             """, unsafe_allow_html=True)
+            
+            # También detener ejecución para evitar procesamiento adicional
+            st.stop()
         
         # Debug temporal - mostrar valores actuales
         st.sidebar.write("🔍 **Debug Info:**")
