@@ -78,19 +78,29 @@ def update_prp_file():
     
     # Verificar si necesita actualización
     if check_file_age(PRP_FILE_PATH):
-        st.info(MESSAGES['updating'])
-        
         # Crear directorio si no existe
         os.makedirs(DATA_FOLDER, exist_ok=True)
         
         # Intentar descargar desde Google Drive
         if GOOGLE_DRIVE_PRP_ID != "TU_ID_DEL_ARCHIVO_AQUI":
+            # Mostrar mensaje temporal de actualización
+            update_placeholder = st.empty()
+            update_placeholder.info(MESSAGES['updating'])
+            
             success = download_from_google_drive(GOOGLE_DRIVE_PRP_ID, PRP_FILE_PATH)
+            
+            # Limpiar mensaje temporal
+            update_placeholder.empty()
+            
             if success:
-                st.success(MESSAGES['updated'])
+                # Mostrar mensaje de éxito temporalmente (se limpia automáticamente al recargar)
+                success_placeholder = st.empty()
+                success_placeholder.success(MESSAGES['updated'])
                 return True
             else:
-                st.warning(MESSAGES['update_failed'])
+                # Solo mostrar error permanentemente
+                st.error(MESSAGES['update_failed'])
+                return False
         else:
             st.warning(MESSAGES['no_id'])
     
@@ -244,20 +254,22 @@ def load_data():
         parts_df = pd.read_csv(PARTS_FILE_PATH)
         prp_df = pd.read_csv(PRP_FILE_PATH)
         
-        # Mostrar información de última actualización desde el CSV
+        # Mostrar información de última actualización desde el CSV de manera discreta
         if not prp_df.empty and 'Fecha De Actualizacion' in prp_df.columns:
             # Obtener la fecha de actualización del PRP (todas las filas tienen la misma fecha)
             fecha_actualizacion = prp_df['Fecha De Actualizacion'].iloc[0]
             try:
                 # Convertir a datetime para mejor formato
                 fecha_dt = pd.to_datetime(fecha_actualizacion)
-                st.sidebar.info(f"📅 Última actualización PRP: {fecha_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                # Solo mostrar en sidebar si no se mostró arriba recientemente
+                if 'data_timestamp' not in st.session_state or st.session_state.data_timestamp != fecha_dt:
+                    st.sidebar.info(f"📅 Última actualización: {fecha_dt.strftime('%H:%M:%S')}")
             except:
-                st.sidebar.info(f"📅 Última actualización PRP: {fecha_actualizacion}")
+                st.sidebar.info(f"📅 Última actualización: {fecha_actualizacion}")
         elif os.path.exists(PRP_FILE_PATH):
             # Fallback a fecha de modificación del archivo si no hay columna
             last_modified = datetime.fromtimestamp(os.path.getmtime(PRP_FILE_PATH))
-            st.sidebar.info(f"{MESSAGES['last_update']}{last_modified.strftime('%Y-%m-%d %H:%M:%S')}")
+            st.sidebar.info(f"📅 Archivo local: {last_modified.strftime('%H:%M:%S')}")
         
         return parts_df, prp_df
     except FileNotFoundError as e:
@@ -273,11 +285,15 @@ def main():
     
     # Botón para forzar actualización de datos
     if st.sidebar.button("🔄 Actualizar Datos Ahora"):
-        # Limpiar cache
-        st.cache_data.clear()
-        # Forzar descarga desde Google Drive
-        if os.path.exists(PRP_FILE_PATH):
-            os.remove(PRP_FILE_PATH)  # Eliminar archivo local para forzar descarga
+        with st.spinner("Actualizando datos..."):
+            # Limpiar cache
+            st.cache_data.clear()
+            # Forzar descarga desde Google Drive
+            if os.path.exists(PRP_FILE_PATH):
+                os.remove(PRP_FILE_PATH)  # Eliminar archivo local para forzar descarga
+            # Limpiar timestamp para mostrar nueva información
+            if 'data_timestamp' in st.session_state:
+                del st.session_state.data_timestamp
         st.rerun()
     
     # Información del sistema de actualización
@@ -307,14 +323,18 @@ def main():
             st.error("❌ No se pudieron cargar los datos necesarios")
             return
         
-        # Mostrar información de actualización prominente
+        # Mostrar información de actualización prominente solo si hay información nueva
         if not prp_df.empty and 'Fecha De Actualizacion' in prp_df.columns:
             fecha_actualizacion = prp_df['Fecha De Actualizacion'].iloc[0]
             try:
                 fecha_dt = pd.to_datetime(fecha_actualizacion)
-                st.info(f"📡 **Datos actualizados desde Google Drive**: {fecha_dt.strftime('%Y-%m-%d a las %H:%M:%S')}")
+                # Solo mostrar si es reciente (últimos 5 minutos) o si es la primera carga
+                time_diff = datetime.now() - fecha_dt
+                if time_diff.total_seconds() < 300 or 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = fecha_dt
+                    st.success(f"📡 **Datos actualizados**: {fecha_dt.strftime('%Y-%m-%d a las %H:%M:%S')}")
             except:
-                st.info(f"📡 **Datos actualizados desde Google Drive**: {fecha_actualizacion}")
+                pass
         
         # Verificar que existen las columnas requeridas
         required_parts_cols = ['cell_name', 'part_numbers', 'pieces_per_container', 'family']
