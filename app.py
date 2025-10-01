@@ -366,25 +366,35 @@ def main():
         # Actualizar session_state con la nueva selección
         st.session_state.refresh_interval = refresh_interval
         
-        # Actualizar URL params para persistencia
-        st.query_params.update({
+        # Actualizar URL params para persistencia (mantener selecciones actuales)
+        current_params = st.query_params
+        update_params = {
             "refresh_enabled": "true",
-            "refresh_interval": str(refresh_interval),
-            "selected_cell": query_params.get("selected_cell", ""),
-            "selected_family": query_params.get("selected_family", "")
-        })
+            "refresh_interval": str(refresh_interval)
+        }
+        # Mantener selecciones actuales si existen
+        if current_params.get("selected_cell"):
+            update_params["selected_cell"] = current_params.get("selected_cell")
+        if current_params.get("selected_family"):
+            update_params["selected_family"] = current_params.get("selected_family")
+        st.query_params.update(update_params)
         
         # Activar auto-refresh HTML
         add_auto_refresh(refresh_interval)
     else:
         refresh_interval = 0  # Deshabilitado
-        # Actualizar URL params
-        st.query_params.update({
+        # Actualizar URL params (mantener selecciones actuales)
+        current_params = st.query_params
+        update_params = {
             "refresh_enabled": "false",
-            "refresh_interval": "300",
-            "selected_cell": query_params.get("selected_cell", ""),
-            "selected_family": query_params.get("selected_family", "")
-        })
+            "refresh_interval": "300"
+        }
+        # Mantener selecciones actuales si existen
+        if current_params.get("selected_cell"):
+            update_params["selected_cell"] = current_params.get("selected_cell")
+        if current_params.get("selected_family"):
+            update_params["selected_family"] = current_params.get("selected_family")
+        st.query_params.update(update_params)
     
     # Botón para forzar actualización de datos
     if st.sidebar.button("🔄 Actualizar Datos Ahora"):
@@ -510,11 +520,14 @@ def main():
             help="Selecciona el tipo de familia"
         )
         
-        # Actualizar URL params para persistencia de selección
-        st.query_params.update({
-            "selected_cell": selected_cell,
-            "selected_family": selected_family
-        })
+        # Actualizar URL params para persistencia (solo si cambió la selección)
+        current_params = st.query_params
+        if (current_params.get("selected_cell") != selected_cell or 
+            current_params.get("selected_family") != selected_family):
+            st.query_params.update({
+                "selected_cell": selected_cell,
+                "selected_family": selected_family
+            })
 
     # Filtrar por la celda y familia seleccionadas
     filtered_parts = parts_df[
