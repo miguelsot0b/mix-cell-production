@@ -266,11 +266,14 @@ def get_visual_color(parts_df, part_number):
             
             # Colores mejorados y más vibrantes para operadores
             color_map = {
-                'Amarillo': '#FFE135',    # Amarillo brillante
-                'Naranja': '#FF8C42',     # Naranja vibrante
-                'Rosa': '#FF69B4',        # Rosa fuerte
-                'Verde': '#32CD32',       # Verde lima brillante
-                'Blanco': '#F5F5F5'       # Blanco suave
+                'Amarillo': '#FFE135',      # Amarillo brillante
+                'Naranja': '#FF8C42',       # Naranja vibrante
+                'Rosa': '#FF69B4',          # Rosa fuerte
+                'Verde': '#32CD32',         # Verde lima brillante
+                'Blanco': '#F5F5F5',        # Blanco suave
+                'Verde Menta': '#00E5A0',   # Verde menta brillante
+                'Azul': '#4169E1',          # Azul real vibrante
+                'Cafe Claro': '#D2B48C'     # Café claro beige
             }
             
             return color_map.get(visual_id, '#E8E8E8')  # Gris claro por defecto
