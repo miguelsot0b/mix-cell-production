@@ -47,27 +47,38 @@ def analyze_prp_for_cell(prp_df, part_numbers):
         
         # Obtener inventario FG actual
         inv_fg = clean_number(row.get('Inv FG', 0))
+        past_due = clean_number(row.get('Past Due', 0))
         
-        # Sumar TODOS los Customer Releases (Past Due + todas las fechas futuras)
-        total_customer_releases = 0
+        # Simular día por día para encontrar cuándo se queda sin inventario
+        running_inventory = inv_fg - past_due  # Restar Past Due primero
         
-        # Past Due
-        total_customer_releases += clean_number(row.get('Past Due', 0))
-        
-        # Todas las columnas de fecha
+        # Obtener columnas de fechas ordenadas
         date_columns = [col for col in prp_df.columns if '/' in str(col) and col != 'Fecha De Actualizacion']
-        for date_col in date_columns:
-            total_customer_releases += clean_number(row.get(date_col, 0))
+        date_columns_sorted = sorted(date_columns, key=lambda x: pd.to_datetime(x, format='%m/%d/%Y'))
         
-        # Calcular déficit: Customer Releases - Inventario FG
-        deficit = total_customer_releases - inv_fg
+        first_shortage_date = None
+        deficit_amount = 0
         
-        if deficit > 0:  # Solo si hay déficit
+        # Revisar día por día hasta encontrar déficit
+        for date_col in date_columns_sorted:
+            daily_demand = clean_number(row.get(date_col, 0))
+            running_inventory -= daily_demand
+            
+            # Si el inventario se vuelve negativo, encontramos el primer déficit
+            if running_inventory < 0 and first_shortage_date is None:
+                first_shortage_date = pd.to_datetime(date_col, format='%m/%d/%Y')
+                deficit_amount = abs(running_inventory)
+                break
+        
+        # Solo incluir si hay déficit (inventario insuficiente)
+        if first_shortage_date is not None:
             results.append({
                 'part_number': part_number,
-                'total_customer_releases': total_customer_releases,
                 'inv_fg': inv_fg,
-                'deficit': deficit
+                'past_due': past_due,
+                'first_shortage_date': first_shortage_date,
+                'deficit': deficit_amount,
+                'days_until_shortage': (first_shortage_date - pd.Timestamp.now()).days
             })
     
     return results
@@ -91,14 +102,14 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas basadas en mayor déficit"""
+    """Obtiene las 3 partes más críticas basadas en fecha más cercana y mayor déficit"""
     if len(prp_analysis) == 0:
         return []
     
-    # Ordenar por déficit (descendente) - los que más necesitan producción
-    sorted_parts = sorted(prp_analysis, key=lambda x: x['deficit'], reverse=True)
+    # Ordenar por: 1) Fecha más cercana (ascendente), 2) Mayor déficit (descendente)
+    sorted_parts = sorted(prp_analysis, key=lambda x: (x['first_shortage_date'], -x['deficit']))
     
-    # Tomar las primeras 3 partes con mayor déficit
+    # Tomar las primeras 3 partes más críticas
     top_3 = sorted_parts[:3]
     
     # Calcular contenedores para cada parte
@@ -272,26 +283,6 @@ def main():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-        
-        # Información adicional de la celda
-        st.markdown("---")
-        st.markdown("## 📊 Información de la Celda")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("🏭 Celda", selected_cell)
-            
-        with col2:
-            st.metric("🎯 Familia", selected_family)
-            
-        with col3:
-            # Obtener el rate de cualquier parte de esta celda (todas tienen el mismo rate)
-            if not filtered_parts.empty:
-                rate = clean_number(filtered_parts.iloc[0].get('rate_per_hour', 0))
-                st.metric("⚡ Rate/Hora", f"{rate:,}")
-            else:
-                st.metric("⚡ Rate/Hora", "N/A")
 
 if __name__ == "__main__":
     main()
