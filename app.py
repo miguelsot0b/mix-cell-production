@@ -369,7 +369,9 @@ def main():
         # Actualizar URL params para persistencia
         st.query_params.update({
             "refresh_enabled": "true",
-            "refresh_interval": str(refresh_interval)
+            "refresh_interval": str(refresh_interval),
+            "selected_cell": query_params.get("selected_cell", ""),
+            "selected_family": query_params.get("selected_family", "")
         })
         
         # Activar auto-refresh HTML
@@ -379,7 +381,9 @@ def main():
         # Actualizar URL params
         st.query_params.update({
             "refresh_enabled": "false",
-            "refresh_interval": "300"
+            "refresh_interval": "300",
+            "selected_cell": query_params.get("selected_cell", ""),
+            "selected_family": query_params.get("selected_family", "")
         })
     
     # Botón para forzar actualización de datos
@@ -470,21 +474,47 @@ def main():
     with st.sidebar:
         st.header("🏭 Selección de Producción")
         
+        # Obtener valores de URL para persistencia de selección
+        url_selected_cell = query_params.get("selected_cell", "")
+        url_selected_family = query_params.get("selected_family", "")
+        
         # Dropdown 1: Cell Name (sin repetir)
         cell_names = sorted(parts_df['cell_name'].unique().tolist())
+        
+        # Determinar índice inicial basado en URL o default al primer elemento
+        try:
+            initial_cell_index = cell_names.index(url_selected_cell) if url_selected_cell in cell_names else 0
+        except (ValueError, IndexError):
+            initial_cell_index = 0
+            
         selected_cell = st.selectbox(
             "📍 Celda:",
             options=cell_names,
+            index=initial_cell_index,
             help="Selecciona la celda de producción"
         )
         
         # Dropdown 2: Family (tipos de familia)
         families = sorted(parts_df['family'].unique().tolist())
+        
+        # Determinar índice inicial basado en URL o default al primer elemento
+        try:
+            initial_family_index = families.index(url_selected_family) if url_selected_family in families else 0
+        except (ValueError, IndexError):
+            initial_family_index = 0
+            
         selected_family = st.selectbox(
             "🎯 Familia:",
             options=families,
+            index=initial_family_index,
             help="Selecciona el tipo de familia"
         )
+        
+        # Actualizar URL params para persistencia de selección
+        st.query_params.update({
+            "selected_cell": selected_cell,
+            "selected_family": selected_family
+        })
 
     # Filtrar por la celda y familia seleccionadas
     filtered_parts = parts_df[
