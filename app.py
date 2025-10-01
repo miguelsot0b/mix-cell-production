@@ -552,8 +552,8 @@ def main():
     # Mostrar TOP 3
     st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
     
-    # Recordatorio importante sobre contenedores en almacén
-    st.info("📦 Enviar contenedores al **ALMACÉN** tras producir")
+    # Recordatorio importante sobre contenedores en almacén y material válido para embarque
+    st.info("📦 **Enviar contenedores al ALMACÉN tras producir**\n\n⚠️ **Material NO válido para embarcar:**\n• Material detenido por calidad (Dock Audit, Hold)\n• Material en piso de producción (no en almacén)")
     
     cols = st.columns(3)
     
