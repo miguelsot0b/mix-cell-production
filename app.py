@@ -312,14 +312,19 @@ def main():
     # Sidebar con controles
     st.sidebar.header("🔧 Controles")
     
-    # Configuración de auto-refresh con persistencia
+    # Configuración de auto-refresh con persistencia usando URL params
     st.sidebar.markdown("### ⚙️ Configuración")
     
-    # Inicializar configuración en session_state si no existe
+    # Obtener parámetros de URL para persistencia
+    query_params = st.query_params
+    url_refresh_enabled = query_params.get("refresh_enabled", "true").lower() == "true"
+    url_refresh_interval = int(query_params.get("refresh_interval", "300"))
+    
+    # Inicializar configuración con valores de URL o defaults
     if 'auto_refresh_enabled' not in st.session_state:
-        st.session_state.auto_refresh_enabled = True
+        st.session_state.auto_refresh_enabled = url_refresh_enabled
     if 'refresh_interval' not in st.session_state:
-        st.session_state.refresh_interval = 300  # Default 5 minutos
+        st.session_state.refresh_interval = url_refresh_interval
     
     auto_refresh_enabled = st.sidebar.checkbox(
         "🔄 Auto-refresh página", 
@@ -351,10 +356,21 @@ def main():
         # Actualizar session_state con la nueva selección
         st.session_state.refresh_interval = refresh_interval
         
+        # Actualizar URL params para persistencia
+        st.query_params.update({
+            "refresh_enabled": "true",
+            "refresh_interval": str(refresh_interval)
+        })
+        
         # Activar auto-refresh HTML
         add_auto_refresh(refresh_interval)
     else:
         refresh_interval = 0  # Deshabilitado
+        # Actualizar URL params
+        st.query_params.update({
+            "refresh_enabled": "false",
+            "refresh_interval": "300"
+        })
     
     # Botón para forzar actualización de datos
     if st.sidebar.button("🔄 Actualizar Datos Ahora"):
