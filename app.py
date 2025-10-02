@@ -166,7 +166,7 @@ def clean_number(value):
         return 0
 
 def analyze_prp_for_cell(prp_df, part_numbers):
-    """Analiza el archivo PRP para obtener información de las partes de una celda específica"""
+    """Analiza el archivo PRP para obtener información de las partes de una celda específica con demanda acumulativa por fechas"""
     results = []
     
     for part_number in part_numbers:
@@ -186,35 +186,75 @@ def analyze_prp_for_cell(prp_df, part_numbers):
         inv_fg = clean_number(row.get('Inv FG', 0))
         past_due = clean_number(row.get('Past Due', 0))
         
-        # Simular día por día para encontrar cuándo se queda sin inventario
-        running_inventory = inv_fg - past_due  # Restar Past Due primero
+        # Calcular inventario disponible inicial
+        available_inventory = inv_fg - past_due
         
         # Obtener columnas de fechas ordenadas
         date_columns = [col for col in prp_df.columns if '/' in str(col) and col != 'Fecha De Actualizacion']
         date_columns_sorted = sorted(date_columns, key=lambda x: pd.to_datetime(x, format='%m/%d/%Y'))
         
+        # Calcular demanda total y encontrar primera fecha crítica
+        total_demand_in_period = 0
         first_shortage_date = None
-        deficit_amount = 0
+        running_inventory = available_inventory
+        max_days_to_analyze = 14  # Analizar máximo 2 semanas hacia adelante
+        days_analyzed = 0
         
-        # Revisar día por día hasta encontrar déficit
+        # Primera pasada: encontrar primera fecha de déficit
         for date_col in date_columns_sorted:
+            if days_analyzed >= max_days_to_analyze:
+                break
+                
             daily_demand = clean_number(row.get(date_col, 0))
             running_inventory -= daily_demand
+            days_analyzed += 1
             
-            # Si el inventario se vuelve negativo, encontramos el primer déficit
+            # Si el inventario se vuelve negativo por primera vez
             if running_inventory < 0 and first_shortage_date is None:
                 first_shortage_date = pd.to_datetime(date_col, format='%m/%d/%Y')
-                deficit_amount = abs(running_inventory)
                 break
         
-        # Solo incluir si hay déficit (inventario insuficiente)
-        if first_shortage_date is not None:
+        # Si no hay déficit, no incluir esta parte
+        if first_shortage_date is None:
+            continue
+            
+        # Segunda pasada: calcular TODA la demanda faltante hasta la fecha crítica
+        # y agregar demanda adicional de la misma parte en días posteriores
+        running_inventory = available_inventory
+        total_deficit = 0
+        
+        for date_col in date_columns_sorted:
+            if days_analyzed >= max_days_to_analyze:
+                break
+                
+            daily_demand = clean_number(row.get(date_col, 0))
+            
+            # Solo contar demanda si hay demanda en este día
+            if daily_demand > 0:
+                running_inventory -= daily_demand
+                
+                # Si el inventario es insuficiente para esta demanda
+                if running_inventory < 0:
+                    # Si es la primera vez que se vuelve negativo
+                    if total_deficit == 0:
+                        total_deficit = abs(running_inventory)
+                    else:
+                        # Agregar toda la demanda del día ya que no se puede cubrir
+                        total_deficit += daily_demand
+                # Si el inventario todavía es positivo pero ya habíamos identificado déficit
+                elif total_deficit > 0:
+                    # Agregar esta demanda al déficit total ya que la parte necesita producirse
+                    total_deficit += daily_demand
+                    running_inventory = 0  # Consumir todo el inventario disponible
+        
+        # Solo incluir si hay déficit real
+        if first_shortage_date is not None and total_deficit > 0:
             results.append({
                 'part_number': part_number,
                 'inv_fg': inv_fg,
                 'past_due': past_due,
                 'first_shortage_date': first_shortage_date,
-                'deficit': deficit_amount,
+                'deficit': total_deficit,  # Demanda acumulativa total para esta parte
                 'days_until_shortage': (first_shortage_date - pd.Timestamp.now()).days
             })
     
