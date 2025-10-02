@@ -291,7 +291,8 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas con lógica Kanban eficiente para evitar cambios frecuentes"""
+    """Obtiene las 3 partes más críticas con lógica Kanban eficiente para evitar cambios frecuentes
+    y agrupando partes iguales para maximizar eficiencia"""
     if len(prp_analysis) == 0:
         return []
     
@@ -330,8 +331,8 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
             'total_containers': sum(calculate_containers_needed(p['deficit'], parts_df, p['part_number']) for p in current_group)
         })
     
-    # Crear secuencia Kanban eficiente
-    kanban_sequence = []
+    # Crear secuencia Kanban inicial
+    initial_sequence = []
     sequence_number = 1
     
     for group in kanban_groups:
@@ -343,17 +344,46 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
             part['kanban_group_date'] = group['date']
             part['kanban_sequence'] = sequence_number
             part['is_same_day_group'] = len(group['parts']) > 1
-            kanban_sequence.append(part)
+            initial_sequence.append(part)
             sequence_number += 1
-            
-            # Limitar a TOP 3 para display, pero mantener lógica de agrupación
-            if len(kanban_sequence) >= 3:
-                break
-        
-        if len(kanban_sequence) >= 3:
-            break
     
-    return kanban_sequence[:3]
+    # NUEVA LÓGICA: Agrupar partes iguales para eficiencia
+    grouped_parts = {}
+    
+    for part in initial_sequence:
+        part_number = part['part_number']
+        
+        if part_number not in grouped_parts:
+            # Primera aparición de la parte
+            grouped_parts[part_number] = part.copy()
+        else:
+            # Parte repetida - agrupar datos
+            existing = grouped_parts[part_number]
+            
+            # Sumar contenedores
+            existing['containers'] += part['containers']
+            existing['deficit'] += part['deficit']
+            
+            # Mantener la fecha más temprana (más crítica)
+            if part['first_shortage_date'] < existing['first_shortage_date']:
+                existing['first_shortage_date'] = part['first_shortage_date']
+                existing['kanban_group_date'] = part['kanban_group_date']
+            
+            # Marcar como agrupada para mostrar al operador
+            existing['is_grouped'] = True
+            existing['grouped_containers'] = existing['containers']
+    
+    # Convertir a lista y mantener orden de criticidad
+    final_sequence = list(grouped_parts.values())
+    
+    # Re-ordenar por fecha más temprana y mayor contenedores agrupados
+    final_sequence = sorted(final_sequence, key=lambda x: (x['first_shortage_date'], -x['containers']))
+    
+    # Reasignar números de secuencia
+    for i, part in enumerate(final_sequence, 1):
+        part['kanban_sequence'] = i
+    
+    return final_sequence[:3]
 
 def detect_same_day_session(current_parts):
     """Detecta si hay múltiples partes del mismo día en la lista actual"""
@@ -812,12 +842,14 @@ def main():
         # Obtener descripción de la parte
         part_description = get_part_description(parts_df, part_number)
         
-        # Indicador de agrupación Kanban (mismo día), bloqueo de secuencia y pull ahead
+        # Indicador de agrupación Kanban (mismo día), bloqueo de secuencia, pull ahead y partes agrupadas
         kanban_indicator = ""
         if part_info.get('is_pull_ahead', False):
             kanban_indicator = "⚡ PULL AHEAD"
         elif part_info.get('is_sequence_locked', False):
             kanban_indicator = "🔒 SECUENCIA BLOQUEADA"
+        elif part_info.get('is_grouped', False):
+            kanban_indicator = "📦 PARTE AGRUPADA"
         elif part_info.get('is_same_day_group', False):
             kanban_indicator = "🔗 MISMO DÍA"
         
