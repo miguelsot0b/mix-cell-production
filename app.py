@@ -326,6 +326,7 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
         grouped_containers = current_part['containers']
         grouped_deficit = current_part['deficit']
         has_grouping = False
+        grouped_parts_list = []  # Para rastrear qué partes fueron agrupadas
         
         for j, other_part in enumerate(sorted_parts[i+1:], i+1):
             if other_part['part_number'] == part_number:
@@ -337,10 +338,14 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
                     grouped_containers += other_containers
                     grouped_deficit += other_part['deficit']
                     has_grouping = True
-                    processed_parts.add(other_part['part_number'])
+                    grouped_parts_list.append(other_part['part_number'])  # Solo rastrear, no procesar aún
                 else:
                     # Ya llegamos al límite - otra parte se vuelve crítica
                     break
+        
+        # Ahora marcar como procesadas las partes que fueron agrupadas
+        for grouped_part in grouped_parts_list:
+            processed_parts.add(grouped_part)
         
         # Actualizar información agrupada
         current_part['containers'] = grouped_containers
