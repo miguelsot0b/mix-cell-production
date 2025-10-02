@@ -355,6 +355,136 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
     
     return kanban_sequence[:3]
 
+def detect_same_day_session(current_parts):
+    """Detecta si hay múltiples partes del mismo día en la lista actual"""
+    if not current_parts:
+        return False
+    
+    today = datetime.now().date()
+    
+    # Contar cuántas partes críticas son para HOY
+    same_day_count = 0
+    for part in current_parts:
+        if part['first_shortage_date'].date() == today:
+            same_day_count += 1
+    
+    # Si hay 2 o más partes para hoy = sesión activa
+    return same_day_count >= 2
+
+def save_daily_sequence(sequence, session_state):
+    """Guarda la secuencia del día en session_state"""
+    today = datetime.now().date()
+    
+    # Guardar solo los identificadores esenciales
+    stored_sequence = []
+    for i, part in enumerate(sequence):
+        stored_sequence.append({
+            'part_number': part['part_number'],
+            'original_priority': i + 1,
+            'kanban_group_date': part.get('kanban_group_date', today)
+        })
+    
+    # Guardar en session_state
+    session_state['daily_kanban_sequence'] = stored_sequence
+    session_state['kanban_sequence_date'] = today
+
+def load_stored_sequence(session_state):
+    """Recupera la secuencia guardada si es del día actual"""
+    today = datetime.now().date()
+    
+    # Verificar si hay secuencia guardada y es de hoy
+    if ('daily_kanban_sequence' in session_state and 
+        'kanban_sequence_date' in session_state and
+        session_state['kanban_sequence_date'] == today):
+        
+        return session_state['daily_kanban_sequence']
+    
+    return None  # No hay secuencia guardada o es de otro día
+
+def apply_stored_sequence(stored_sequence, current_sequence):
+    """Aplica la secuencia guardada a los datos actuales"""
+    result = []
+    
+    # Crear un diccionario de partes actuales para búsqueda rápida
+    current_parts_dict = {part['part_number']: part for part in current_sequence}
+    
+    # Aplicar el orden guardado
+    for stored_part in stored_sequence:
+        part_number = stored_part['part_number']
+        
+        # Si la parte aún existe en datos actuales
+        if part_number in current_parts_dict:
+            # Tomar datos actuales pero mantener prioridad original
+            current_part = current_parts_dict[part_number].copy()
+            current_part['locked_priority'] = stored_part['original_priority']
+            current_part['is_sequence_locked'] = True
+            result.append(current_part)
+    
+    return result[:3]  # Limitar a TOP 3
+
+def detect_pull_ahead(current_sequence, stored_sequence):
+    """Detecta si hay un pull ahead que requiere romper el lock de secuencia"""
+    if not stored_sequence or not current_sequence:
+        return False
+    
+    # Obtener la fecha más temprana de la secuencia guardada
+    stored_earliest_date = None
+    for stored_part in stored_sequence:
+        # La fecha se guarda como kanban_group_date
+        stored_date = stored_part.get('kanban_group_date')
+        if stored_date and (stored_earliest_date is None or stored_date < stored_earliest_date):
+            stored_earliest_date = stored_date
+    
+    # Obtener la fecha más temprana de la secuencia actual
+    current_earliest_date = None
+    for current_part in current_sequence:
+        current_date = current_part['first_shortage_date'].date()
+        if current_earliest_date is None or current_date < current_earliest_date:
+            current_earliest_date = current_date
+    
+    # Si la fecha más temprana actual es anterior a la guardada = PULL AHEAD
+    if (stored_earliest_date and current_earliest_date and 
+        current_earliest_date < stored_earliest_date):
+        return True
+    
+    return False
+
+def get_top_3_critical_parts_with_lock(prp_analysis, parts_df, session_state):
+    """Versión mejorada que respeta la secuencia diaria para evitar cambios innecesarios, 
+    pero detecta pull ahead para casos urgentes"""
+    if len(prp_analysis) == 0:
+        return []
+    
+    # PASO 1: Calcular secuencia actual normal
+    current_sequence = get_top_3_critical_parts(prp_analysis, parts_df)
+    
+    # PASO 2: Verificar si hay sesión del mismo día activa
+    if detect_same_day_session(current_sequence):
+        
+        # PASO 3: Intentar cargar secuencia guardada
+        stored_sequence = load_stored_sequence(session_state)
+        
+        if stored_sequence:
+            # PASO 4: DETECTAR PULL AHEAD antes de aplicar lock
+            if detect_pull_ahead(current_sequence, stored_sequence):
+                # PULL AHEAD DETECTADO - Romper lock y crear nueva secuencia
+                save_daily_sequence(current_sequence, session_state)
+                # Marcar las partes nuevas como pull ahead para mostrar al operador
+                for part in current_sequence:
+                    if part['first_shortage_date'].date() < datetime.now().date():
+                        part['is_pull_ahead'] = True
+                return current_sequence
+            
+            # PASO 5: No hay pull ahead - Aplicar secuencia guardada a datos actuales
+            locked_sequence = apply_stored_sequence(stored_sequence, current_sequence)
+            if locked_sequence:
+                return locked_sequence
+    
+    # PASO 6: Primera vez del día o no hay sesión activa
+    # Guardar nueva secuencia
+    save_daily_sequence(current_sequence, session_state)
+    return current_sequence
+
 def get_part_description(parts_df, part_number):
     """Obtiene la descripción de una parte específica"""
     try:
@@ -666,8 +796,8 @@ def main():
         st.info("Todas las partes tienen suficiente inventario para cubrir los Customer Releases")
         return
     
-    # Obtener TOP 3 partes críticas
-    top_3_parts = get_top_3_critical_parts(prp_analysis, parts_df)
+    # Obtener TOP 3 partes críticas con lock de secuencia Kanban
+    top_3_parts = get_top_3_critical_parts_with_lock(prp_analysis, parts_df, st.session_state)
     
     if not top_3_parts:
         st.success("✅ No hay partes críticas para esta celda en este momento")
@@ -675,6 +805,12 @@ def main():
     
     # Mostrar TOP 3
     st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
+    
+    # Indicador de secuencia bloqueada y pull ahead
+    if any(part.get('is_pull_ahead', False) for part in top_3_parts):
+        st.error("⚡ **PULL AHEAD DETECTADO**: Nueva demanda urgente encontrada. Secuencia recalculada automáticamente. ¡PRIORIDAD MÁXIMA!")
+    elif any(part.get('is_sequence_locked', False) for part in top_3_parts):
+        st.warning("🔒 **SECUENCIA BLOQUEADA**: Manteniendo orden original del día para evitar cambios innecesarios. La secuencia se recalculará al completar todas las partes del mismo día.")
     
     # Información sobre la lógica Kanban eficiente
     if top_3_parts and any(part.get('is_same_day_group', False) for part in top_3_parts):
@@ -696,9 +832,13 @@ def main():
         # Obtener descripción de la parte
         part_description = get_part_description(parts_df, part_number)
         
-        # Indicador de agrupación Kanban (mismo día)
+        # Indicador de agrupación Kanban (mismo día), bloqueo de secuencia y pull ahead
         kanban_indicator = ""
-        if part_info.get('is_same_day_group', False):
+        if part_info.get('is_pull_ahead', False):
+            kanban_indicator = "⚡ PULL AHEAD"
+        elif part_info.get('is_sequence_locked', False):
+            kanban_indicator = "🔒 SECUENCIA BLOQUEADA"
+        elif part_info.get('is_same_day_group', False):
             kanban_indicator = "🔗 MISMO DÍA"
         
         with cols[i]:
