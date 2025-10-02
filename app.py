@@ -721,9 +721,8 @@ def main():
                 # Número de contenedores grande
                 st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
                 
-                # Información del faltante con fecha
-                date_info = part_info['first_shortage_date'].strftime('%m/%d')
-                st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong><br><span style='font-size: 12px; color: #666;'>Para: {date_info}</span></div>", unsafe_allow_html=True)
+                # Información del faltante sin fecha específica
+                st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
 
     # Activar auto-refresh HTML al final, después de actualizar todos los params
     if auto_refresh_enabled:
