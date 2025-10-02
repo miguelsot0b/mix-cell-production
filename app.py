@@ -812,13 +812,6 @@ def main():
     elif any(part.get('is_sequence_locked', False) for part in top_3_parts):
         st.warning("🔒 **SECUENCIA BLOQUEADA**: Manteniendo orden original del día para evitar cambios innecesarios. La secuencia se recalculará al completar todas las partes del mismo día.")
     
-    # Información sobre la lógica Kanban eficiente
-    if top_3_parts and any(part.get('is_same_day_group', False) for part in top_3_parts):
-        st.info("🔗 **ESTRATEGIA KANBAN**: Las partes marcadas con 'MISMO DÍA' deben completarse en secuencia antes de cambiar de producto. Esto reduce changeovers y maximiza eficiencia.")
-    
-    # Recordatorio importante sobre contenedores en almacén y material válido para embarque
-    st.info("📦 **Enviar contenedores al ALMACÉN tras producir**\n\n⚠️ **Material NO válido para embarcar:**\n• Material detenido por calidad (Dock Audit, Hold)\n• Material en piso de producción (no en almacén)")
-    
     cols = st.columns(3)
     
     for i, part_info in enumerate(top_3_parts):
