@@ -675,19 +675,6 @@ def main():
             st.error("❌ No se pudieron cargar los datos necesarios")
             return
         
-        # Mostrar información de actualización prominente solo si hay información nueva
-        if not prp_df.empty and 'Fecha De Actualizacion' in prp_df.columns:
-            fecha_actualizacion = prp_df['Fecha De Actualizacion'].iloc[0]
-            try:
-                fecha_dt = pd.to_datetime(fecha_actualizacion)
-                # Solo mostrar si es reciente (últimos 5 minutos) o si es la primera carga
-                time_diff = datetime.now() - fecha_dt
-                if time_diff.total_seconds() < 300 or 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = fecha_dt
-                    st.success(f"📡 **Datos actualizados**: {fecha_dt.strftime('%Y-%m-%d a las %H:%M:%S')}")
-            except:
-                pass
-        
         # Verificar que existen las columnas requeridas
         required_parts_cols = ['cell_name', 'part_numbers', 'pieces_per_container', 'family']
         missing_cols = [col for col in required_parts_cols if col not in parts_df.columns]
