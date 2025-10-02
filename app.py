@@ -312,25 +312,36 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
     if len(candidates) < 2:
         return candidates
     
-    # LÓGICA SIMPLE: Si prioridad 2 o 3 son mismo día Y misma parte que prioridad 1 → SUMAR
+    # LÓGICA CORREGIDA: Si prioridad 2 y 3 son del mismo día, agrupar cualquiera que sea igual a prioridad 1
     priority_1 = candidates[0]
-    priority_1_date = priority_1['first_shortage_date'].date()
     priority_1_part = priority_1['part_number']
+    priority_1_date = priority_1['first_shortage_date'].date()
     
-    # Buscar en prioridades 2 y 3 si hay mismo día + misma parte
+    # Verificar si prioridad 2 y 3 son del mismo día
+    same_day_between_2_and_3 = False
+    if len(candidates) >= 3:
+        priority_2_date = candidates[1]['first_shortage_date'].date()
+        priority_3_date = candidates[2]['first_shortage_date'].date()
+        same_day_between_2_and_3 = (priority_2_date == priority_3_date)
+    
+    # Si prioridad 2 y 3 son del mismo día, buscar cuáles tienen la misma parte que prioridad 1
     parts_to_group = [priority_1]  # Siempre incluir prioridad 1
     remaining_parts = []
     
-    for i, candidate in enumerate(candidates[1:], 1):  # Prioridades 2 y 3
-        candidate_date = candidate['first_shortage_date'].date()
-        candidate_part = candidate['part_number']
-        
-        # Si es mismo día Y misma parte que prioridad 1 → AGRUPAR
-        if candidate_date == priority_1_date and candidate_part == priority_1_part:
-            parts_to_group.append(candidate)
-        else:
-            # Mantener como parte separada
-            remaining_parts.append(candidate)
+    if same_day_between_2_and_3:
+        # Solo si 2 y 3 son del mismo día, buscar mismas partes para agrupar
+        for candidate in candidates[1:]:  # Prioridades 2 y 3
+            candidate_part = candidate['part_number']
+            
+            # Si es misma parte que prioridad 1 → AGRUPAR
+            if candidate_part == priority_1_part:
+                parts_to_group.append(candidate)
+            else:
+                # Mantener como parte separada
+                remaining_parts.append(candidate)
+    else:
+        # Si prioridad 2 y 3 NO son del mismo día, no agrupar nada
+        remaining_parts = candidates[1:]
     
     # Crear resultado final
     result = []
