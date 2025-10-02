@@ -309,6 +309,17 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
     
     return top_3
 
+def get_part_description(parts_df, part_number):
+    """Obtiene la descripción de una parte específica"""
+    try:
+        part_info = parts_df[parts_df['part_numbers'] == part_number]
+        if not part_info.empty:
+            description = part_info.iloc[0]['description']
+            return description if pd.notna(description) else ""
+    except:
+        pass
+    return ""
+
 def get_visual_color(parts_df, part_number):
     """Obtiene el color visual basado en visual_id con colores mejorados para operadores"""
     try:
@@ -632,14 +643,21 @@ def main():
         # Obtener color de fondo basado en visual_id
         bg_color = get_visual_color(parts_df, part_number)
         
+        # Obtener descripción de la parte
+        part_description = get_part_description(parts_df, part_number)
+        
         with cols[i]:
             # Usar componentes nativos de Streamlit en lugar de HTML personalizado
             with st.container():
                 # Badge de prioridad y título
                 st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>PRIORIDAD #{i+1}</strong></div>", unsafe_allow_html=True)
                 
-                # Número de parte con color de fondo
-                st.markdown(f"<div style='background-color: {bg_color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 2px solid rgba(0,0,0,0.1);'><strong>{part_number}</strong></div>", unsafe_allow_html=True)
+                # Número de parte y descripción con color de fondo
+                part_display = f"<strong>{part_number}</strong>"
+                if part_description:
+                    part_display += f"<br><span style='font-size: 12px; opacity: 0.8;'>{part_description}</span>"
+                
+                st.markdown(f"<div style='background-color: {bg_color}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 2px solid rgba(0,0,0,0.1);'>{part_display}</div>", unsafe_allow_html=True)
                 
                 # Número de contenedores grande
                 st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
