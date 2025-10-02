@@ -291,23 +291,69 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas basadas en fecha más cercana y mayor déficit"""
+    """Obtiene las 3 partes más críticas con lógica Kanban eficiente para evitar cambios frecuentes"""
     if len(prp_analysis) == 0:
         return []
     
     # Ordenar por: 1) Fecha más cercana (ascendente), 2) Mayor déficit (descendente)
     sorted_parts = sorted(prp_analysis, key=lambda x: (x['first_shortage_date'], -x['deficit']))
     
-    # Tomar las primeras 3 partes más críticas
-    top_3 = sorted_parts[:3]
+    # Lógica Kanban eficiente: agrupar demandas del mismo día
+    kanban_groups = []
+    current_date = None
+    current_group = []
     
-    # Calcular contenedores para cada parte
-    for part in top_3:
-        part['containers'] = calculate_containers_needed(
-            part['deficit'], parts_df, part['part_number']
-        )
+    for part in sorted_parts:
+        part_date = part['first_shortage_date'].date()
+        
+        if current_date != part_date:
+            # Si cambia la fecha, procesar el grupo anterior
+            if current_group:
+                kanban_groups.append({
+                    'date': current_date,
+                    'parts': current_group,
+                    'total_containers': sum(calculate_containers_needed(p['deficit'], parts_df, p['part_number']) for p in current_group)
+                })
+            
+            # Iniciar nuevo grupo
+            current_date = part_date
+            current_group = [part]
+        else:
+            # Misma fecha, agregar al grupo actual
+            current_group.append(part)
     
-    return top_3
+    # Procesar el último grupo
+    if current_group:
+        kanban_groups.append({
+            'date': current_date,
+            'parts': current_group,
+            'total_containers': sum(calculate_containers_needed(p['deficit'], parts_df, p['part_number']) for p in current_group)
+        })
+    
+    # Crear secuencia Kanban eficiente
+    kanban_sequence = []
+    sequence_number = 1
+    
+    for group in kanban_groups:
+        # Ordenar partes dentro del grupo por mayor déficit
+        group_parts = sorted(group['parts'], key=lambda x: -x['deficit'])
+        
+        for part in group_parts:
+            part['containers'] = calculate_containers_needed(part['deficit'], parts_df, part['part_number'])
+            part['kanban_group_date'] = group['date']
+            part['kanban_sequence'] = sequence_number
+            part['is_same_day_group'] = len(group['parts']) > 1
+            kanban_sequence.append(part)
+            sequence_number += 1
+            
+            # Limitar a TOP 3 para display, pero mantener lógica de agrupación
+            if len(kanban_sequence) >= 3:
+                break
+        
+        if len(kanban_sequence) >= 3:
+            break
+    
+    return kanban_sequence[:3]
 
 def get_part_description(parts_df, part_number):
     """Obtiene la descripción de una parte específica"""
@@ -630,6 +676,10 @@ def main():
     # Mostrar TOP 3
     st.markdown("## 🎯 SECUENCIA DE PRODUCCIÓN")
     
+    # Información sobre la lógica Kanban eficiente
+    if top_3_parts and any(part.get('is_same_day_group', False) for part in top_3_parts):
+        st.info("🔗 **ESTRATEGIA KANBAN**: Las partes marcadas con 'MISMO DÍA' deben completarse en secuencia antes de cambiar de producto. Esto reduce changeovers y maximiza eficiencia.")
+    
     # Recordatorio importante sobre contenedores en almacén y material válido para embarque
     st.info("📦 **Enviar contenedores al ALMACÉN tras producir**\n\n⚠️ **Material NO válido para embarcar:**\n• Material detenido por calidad (Dock Audit, Hold)\n• Material en piso de producción (no en almacén)")
     
@@ -646,11 +696,20 @@ def main():
         # Obtener descripción de la parte
         part_description = get_part_description(parts_df, part_number)
         
+        # Indicador de agrupación Kanban (mismo día)
+        kanban_indicator = ""
+        if part_info.get('is_same_day_group', False):
+            kanban_indicator = "🔗 MISMO DÍA"
+        
         with cols[i]:
             # Usar componentes nativos de Streamlit en lugar de HTML personalizado
             with st.container():
-                # Badge de prioridad y título
-                st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>PRIORIDAD #{i+1}</strong></div>", unsafe_allow_html=True)
+                # Badge de prioridad y título con indicador Kanban
+                priority_text = f"PRIORIDAD #{i+1}"
+                if kanban_indicator:
+                    priority_text += f"<br><span style='font-size: 10px;'>{kanban_indicator}</span>"
+                
+                st.markdown(f"<div style='background-color: #d73502; color: white; padding: 5px 10px; border-radius: 10px; text-align: center; margin-bottom: 10px;'><strong>{priority_text}</strong></div>", unsafe_allow_html=True)
                 
                 # Número de parte y descripción con color de fondo
                 part_display = f"<strong>{part_number}</strong>"
@@ -662,8 +721,9 @@ def main():
                 # Número de contenedores grande
                 st.markdown(f"<div style='text-align: center; margin: 20px 0;'><div style='font-size: 64px; font-weight: 900; color: #d73502; margin: 0;'>{containers}</div><div style='font-size: 20px; color: #333; font-weight: bold;'>CONTENEDORES</div></div>", unsafe_allow_html=True)
                 
-                # Información del faltante
-                st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong></div>", unsafe_allow_html=True)
+                # Información del faltante con fecha
+                date_info = part_info['first_shortage_date'].strftime('%m/%d')
+                st.markdown(f"<div style='background-color: rgba(215,53,2,0.1); padding: 10px; border-radius: 10px; text-align: center; border-top: 3px solid #d73502;'><strong style='color: #d73502;'>Faltante: {deficit:,} piezas</strong><br><span style='font-size: 12px; color: #666;'>Para: {date_info}</span></div>", unsafe_allow_html=True)
 
     # Activar auto-refresh HTML al final, después de actualizar todos los params
     if auto_refresh_enabled:
