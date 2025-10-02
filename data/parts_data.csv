@@ -71,3 +71,7 @@ cell_name,part_numbers,description,rate_per_hour,pieces_per_container,family,vis
 725 Primarios,FGFOGO00077-NA-AG,U725 FRT DR PRIMARY 3D LH,196,308,Servicios,Naranja
 725 Primarios,FGFOGO00077-SE-AF,U725 FRT DR PRIMARY 3D LH,196,308,Servicios,Naranja
 725 Primarios,FGFOGO00077-SE-AG,U725 FRT DR PRIMARY 3D LH,196,308,Servicios,Naranja
+BMW Tailgate/Liftgate,FGBMGO00031-SL-01,LIFTGATE G20 BMW,70,77,Produccion Regular,
+BMW Tailgate/Liftgate,FGBMGO00036-DC,G42 TAILGATE BMW,70,55,Servicios,
+BMW Tailgate/Liftgate,FGBMGO00036-SE,G42 TAILGATE BMW,70,55,Servicios,
+BMW Tailgate/Liftgate,FGBMGO00036-SL,G42 TAILGATE BMW,70,55,Produccion Regular,
