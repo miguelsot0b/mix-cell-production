@@ -291,91 +291,80 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas con agrupación inteligente que respeta fechas críticas de otras partes"""
+    """Obtiene las 3 partes más críticas con agrupación simple cuando son mismo día y misma parte"""
     if len(prp_analysis) == 0:
         return []
     
     # Ordenar por: 1) Fecha más cercana (ascendente), 2) Mayor déficit (descendente)
     sorted_parts = sorted(prp_analysis, key=lambda x: (x['first_shortage_date'], -x['deficit']))
     
-    # DEBUG: Imprimir datos de entrada
-    print(f"DEBUG: Total parts to analyze: {len(sorted_parts)}")
-    for i, part in enumerate(sorted_parts[:5]):  # Solo los primeros 5
-        print(f"DEBUG: Part {i}: {part['part_number']} - Date: {part['first_shortage_date'].date()} - Deficit: {part['deficit']}")
+    # Tomar las primeras 3 partes como candidatas
+    if len(sorted_parts) < 3:
+        candidates = sorted_parts
+    else:
+        candidates = sorted_parts[:3]
     
-    # Algoritmo simplificado: procesar secuencialmente pero agrupar inteligentemente
-    result_sequence = []
-    processed_parts = set()
+    # Calcular contenedores para cada parte
+    for part in candidates:
+        part['containers'] = calculate_containers_needed(part['deficit'], parts_df, part['part_number'])
+        part['kanban_group_date'] = part['first_shortage_date'].date()
     
-    for i, current_part in enumerate(sorted_parts):
-        part_number = current_part['part_number']
-        
-        if part_number in processed_parts:
-            continue
-        
-        # Calcular contenedores de esta aparición
-        current_containers = calculate_containers_needed(current_part['deficit'], parts_df, part_number)
-        current_date = current_part['first_shortage_date'].date()
-        
-        print(f"DEBUG: Processing {part_number} - Initial containers: {current_containers}")
-        
-        # Buscar la próxima fecha crítica de OTRA parte diferente
-        next_critical_date = None
-        for j in range(i + 1, len(sorted_parts)):
-            if sorted_parts[j]['part_number'] != part_number:
-                next_critical_date = sorted_parts[j]['first_shortage_date'].date()
-                print(f"DEBUG: Next critical date for other part: {next_critical_date}")
-                break
-        
-        # Buscar otras apariciones de la MISMA parte y agrupar hasta el límite
-        total_containers = current_containers
-        total_deficit = current_part['deficit']
-        grouped_count = 1
-        
-        for j in range(i + 1, len(sorted_parts)):
-            other_part = sorted_parts[j]
-            
-            if other_part['part_number'] == part_number:
-                other_date = other_part['first_shortage_date'].date()
-                
-                # Solo agrupar si no interfiere con otra parte crítica
-                if next_critical_date is None or other_date < next_critical_date:
-                    other_containers = calculate_containers_needed(other_part['deficit'], parts_df, part_number)
-                    total_containers += other_containers
-                    total_deficit += other_part['deficit']
-                    grouped_count += 1
-                    print(f"DEBUG: Adding {other_containers} containers from {other_date} (total now: {total_containers})")
-                else:
-                    print(f"DEBUG: Stopping grouping at {other_date} due to critical date {next_critical_date}")
-                    break
-        
-        # Crear la entrada final
-        final_part = current_part.copy()
-        final_part['containers'] = total_containers
-        final_part['deficit'] = total_deficit
-        final_part['kanban_group_date'] = current_date
-        final_part['kanban_sequence'] = len(result_sequence) + 1
-        
-        if grouped_count > 1:
-            final_part['is_grouped'] = True
-            final_part['grouped_containers'] = total_containers
-            print(f"DEBUG: Part {part_number} GROUPED with {grouped_count} entries = {total_containers} total containers")
-        
-        # Determinar si es mismo día con otras partes
-        same_day_others = [p for p in sorted_parts if p['first_shortage_date'].date() == current_date and p['part_number'] != part_number]
-        final_part['is_same_day_group'] = len(same_day_others) > 0
-        
-        result_sequence.append(final_part)
-        processed_parts.add(part_number)
-        
-        print(f"DEBUG: Added {part_number} to result with {total_containers} containers")
-        
-        # Limitar a TOP 3
-        if len(result_sequence) >= 3:
-            break
+    if len(candidates) < 2:
+        return candidates
     
-    print(f"DEBUG: Final result sequence length: {len(result_sequence)}")
-    return result_sequence[:3]
+    # LÓGICA SIMPLE: Si prioridad 2 o 3 son mismo día Y misma parte que prioridad 1 → SUMAR
+    priority_1 = candidates[0]
+    priority_1_date = priority_1['first_shortage_date'].date()
+    priority_1_part = priority_1['part_number']
+    
+    # Buscar en prioridades 2 y 3 si hay mismo día + misma parte
+    parts_to_group = [priority_1]  # Siempre incluir prioridad 1
+    remaining_parts = []
+    
+    for i, candidate in enumerate(candidates[1:], 1):  # Prioridades 2 y 3
+        candidate_date = candidate['first_shortage_date'].date()
+        candidate_part = candidate['part_number']
+        
+        # Si es mismo día Y misma parte que prioridad 1 → AGRUPAR
+        if candidate_date == priority_1_date and candidate_part == priority_1_part:
+            parts_to_group.append(candidate)
+        else:
+            # Mantener como parte separada
+            remaining_parts.append(candidate)
+    
+    # Crear resultado final
+    result = []
+    
+    # Prioridad 1 (potencialmente agrupada)
+    if len(parts_to_group) > 1:
+        # AGRUPAR: Sumar contenedores y déficit
+        total_containers = sum(p['containers'] for p in parts_to_group)
+        total_deficit = sum(p['deficit'] for p in parts_to_group)
+        
+        grouped_part = priority_1.copy()
+        grouped_part['containers'] = total_containers
+        grouped_part['deficit'] = total_deficit
+        grouped_part['is_grouped'] = True
+        grouped_part['grouped_containers'] = total_containers
+        grouped_part['kanban_sequence'] = 1
+        
+        result.append(grouped_part)
+    else:
+        # No hay agrupación
+        priority_1['kanban_sequence'] = 1
+        result.append(priority_1)
+    
+    # Agregar partes restantes (prioridades 2 y 3)
+    for i, part in enumerate(remaining_parts):
+        part['kanban_sequence'] = len(result) + 1
+        
+        # Marcar si es mismo día que prioridad 1
+        if part['first_shortage_date'].date() == priority_1_date:
+            part['is_same_day_group'] = True
+        
+        result.append(part)
+    
+    return result[:3]
 
 def detect_same_day_session(current_parts):
     """Detecta si hay múltiples partes del mismo día en la lista actual"""
