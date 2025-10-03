@@ -196,7 +196,7 @@ def analyze_prp_for_cell(prp_df, part_numbers):
         
         # Simular inventario día por día para encontrar déficits
         running_inventory = available_inventory
-        max_days_to_analyze = 14  # Analizar máximo 2 semanas hacia adelante
+        max_days_to_analyze = 30  # Analizar máximo 30 días (1 mes) hacia adelante
         days_analyzed = 0
         
         for date_col in date_columns_sorted:
