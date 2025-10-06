@@ -291,12 +291,15 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas con lógica conservadora día por día - NO agrupa si hay competencia"""
+    """Obtiene las 3 partes más críticas priorizando SIEMPRE el día actual primero"""
     if len(prp_analysis) == 0:
         return []
     
     # Ordenar por: 1) Fecha más cercana (ascendente), 2) Mayor déficit (descendente)
     sorted_parts = sorted(prp_analysis, key=lambda x: (x['first_shortage_date'], -x['deficit']))
+    
+    # Obtener fecha actual
+    today = datetime.now().date()
     
     # Agrupar por fechas para análisis día por día
     daily_groups = {}
@@ -306,14 +309,20 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
             daily_groups[date_key] = []
         daily_groups[date_key].append(part)
     
-    # Ordenar fechas
+    # PRIORIDAD: Empezar SIEMPRE con el día actual si existe
     sorted_dates = sorted(daily_groups.keys())
+    if today in daily_groups:
+        # Mover día actual al inicio
+        ordered_dates = [today] + [d for d in sorted_dates if d != today]
+    else:
+        # Si no hay déficit hoy, usar orden normal
+        ordered_dates = sorted_dates
     
-    # LÓGICA CONSERVADORA: Solo agrupa hasta que aparezca competencia
+    # Análisis conservador día por día
     result_sequence = []
     processed_parts = set()
     
-    for i, current_date in enumerate(sorted_dates):
+    for i, current_date in enumerate(ordered_dates):
         current_day_parts = daily_groups[current_date]
         
         for part in sorted(current_day_parts, key=lambda x: -x['deficit']):
@@ -326,8 +335,8 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
             grouped_days = 1
             
             # SOLO si este día tiene UNA SOLA parte, buscar continuidad en EL SIGUIENTE día
-            if len(current_day_parts) == 1 and i + 1 < len(sorted_dates):
-                next_date = sorted_dates[i + 1]
+            if len(current_day_parts) == 1 and i + 1 < len(ordered_dates):
+                next_date = ordered_dates[i + 1]
                 next_day_parts = daily_groups[next_date]
                 
                 # Buscar si la MISMA parte aparece en el día siguiente
@@ -351,6 +360,10 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
             final_part['deficit'] = total_deficit
             final_part['kanban_group_date'] = current_date
             final_part['kanban_sequence'] = len(result_sequence) + 1
+            
+            # Marcar si es crítico para HOY
+            if current_date == today:
+                final_part['is_today_critical'] = True
             
             if grouped_days > 1:
                 final_part['is_grouped'] = True
@@ -831,12 +844,14 @@ def main():
         # Obtener descripción de la parte
         part_description = get_part_description(parts_df, part_number)
         
-        # Indicador de agrupación Kanban (mismo día), bloqueo de secuencia, pull ahead y partes agrupadas
+        # Indicador de agrupación Kanban (mismo día), bloqueo de secuencia, pull ahead, partes agrupadas y crítico HOY
         kanban_indicator = ""
         if part_info.get('is_pull_ahead', False):
             kanban_indicator = "⚡ PULL AHEAD"
         elif part_info.get('is_sequence_locked', False):
             kanban_indicator = "🔒 SECUENCIA BLOQUEADA"
+        elif part_info.get('is_today_critical', False):
+            kanban_indicator = "🚨 CRÍTICO HOY"
         elif part_info.get('is_grouped', False):
             kanban_indicator = "📦 PARTE AGRUPADA"
         elif part_info.get('is_same_day_group', False):
