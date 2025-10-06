@@ -291,7 +291,7 @@ def calculate_containers_needed(deficit, parts_df, part_number):
     return containers
 
 def get_top_3_critical_parts(prp_analysis, parts_df):
-    """Obtiene las 3 partes más críticas con lógica de continuidad inteligente día por día"""
+    """Obtiene las 3 partes más críticas con lógica conservadora día por día - NO agrupa si hay competencia"""
     if len(prp_analysis) == 0:
         return []
     
@@ -309,81 +309,66 @@ def get_top_3_critical_parts(prp_analysis, parts_df):
     # Ordenar fechas
     sorted_dates = sorted(daily_groups.keys())
     
-    # NUEVA LÓGICA: Continuidad inteligente día por día
+    # LÓGICA CONSERVADORA: Solo agrupa hasta que aparezca competencia
     result_sequence = []
     processed_parts = set()
     
-    for current_date in sorted_dates:
+    for i, current_date in enumerate(sorted_dates):
         current_day_parts = daily_groups[current_date]
         
-        # Si es el primer día y solo hay una parte, buscar continuidad
-        if len(current_day_parts) == 1:
-            part = current_day_parts[0]
-            part_number = part['part_number']
-            
-            if part_number in processed_parts:
+        for part in sorted(current_day_parts, key=lambda x: -x['deficit']):
+            if part['part_number'] in processed_parts:
                 continue
                 
-            # Buscar si esta parte continúa en días siguientes
+            part_number = part['part_number']
             total_containers = calculate_containers_needed(part['deficit'], parts_df, part_number)
             total_deficit = part['deficit']
-            grouped_days = [current_date]
+            grouped_days = 1
             
-            # Revisar días subsecuentes para esta misma parte
-            for next_date in sorted_dates[sorted_dates.index(current_date) + 1:]:
+            # SOLO si este día tiene UNA SOLA parte, buscar continuidad en EL SIGUIENTE día
+            if len(current_day_parts) == 1 and i + 1 < len(sorted_dates):
+                next_date = sorted_dates[i + 1]
                 next_day_parts = daily_groups[next_date]
                 
-                # Buscar si la misma parte aparece en el día siguiente
-                same_part_in_next_day = None
+                # Buscar si la MISMA parte aparece en el día siguiente
+                same_part_next_day = None
                 for next_part in next_day_parts:
                     if next_part['part_number'] == part_number:
-                        same_part_in_next_day = next_part
+                        same_part_next_day = next_part
                         break
                 
-                if same_part_in_next_day:
-                    # Continuar agrupando esta parte
-                    total_containers += calculate_containers_needed(same_part_in_next_day['deficit'], parts_df, part_number)
-                    total_deficit += same_part_in_next_day['deficit']
-                    grouped_days.append(next_date)
-                else:
-                    # Esta parte ya no aparece en días siguientes, terminar agrupación
-                    break
+                # SOLO agrupa si la misma parte está en el siguiente día
+                if same_part_next_day:
+                    total_containers += calculate_containers_needed(same_part_next_day['deficit'], parts_df, part_number)
+                    total_deficit += same_part_next_day['deficit']
+                    grouped_days = 2
+                    # Marcar como procesada para no repetir
+                    processed_parts.add(part_number)
             
-            # Crear entrada agrupada
-            grouped_part = part.copy()
-            grouped_part['containers'] = total_containers
-            grouped_part['deficit'] = total_deficit
-            grouped_part['kanban_group_date'] = current_date
-            grouped_part['kanban_sequence'] = len(result_sequence) + 1
+            # Crear entrada (agrupada o individual)
+            final_part = part.copy()
+            final_part['containers'] = total_containers
+            final_part['deficit'] = total_deficit
+            final_part['kanban_group_date'] = current_date
+            final_part['kanban_sequence'] = len(result_sequence) + 1
             
-            if len(grouped_days) > 1:
-                grouped_part['is_grouped'] = True
-                grouped_part['grouped_containers'] = total_containers
-                grouped_part['grouped_days'] = len(grouped_days)
+            if grouped_days > 1:
+                final_part['is_grouped'] = True
+                final_part['grouped_containers'] = total_containers
+                final_part['grouped_days'] = grouped_days
             
-            result_sequence.append(grouped_part)
+            # Marcar si es mismo día con otras partes
+            if len(current_day_parts) > 1:
+                final_part['is_same_day_group'] = True
+            
+            result_sequence.append(final_part)
             processed_parts.add(part_number)
             
-        else:
-            # Día con múltiples partes - procesar individualmente por déficit
-            day_parts_sorted = sorted(current_day_parts, key=lambda x: -x['deficit'])
-            
-            for part in day_parts_sorted:
-                if part['part_number'] in processed_parts:
-                    continue
-                    
-                part['containers'] = calculate_containers_needed(part['deficit'], parts_df, part['part_number'])
-                part['kanban_group_date'] = current_date
-                part['kanban_sequence'] = len(result_sequence) + 1
-                
-                # Marcar si es mismo día con otras partes
-                if len(current_day_parts) > 1:
-                    part['is_same_day_group'] = True
-                
-                result_sequence.append(part)
-                processed_parts.add(part['part_number'])
+            # Limitar a TOP 3
+            if len(result_sequence) >= 3:
+                break
         
-        # Limitar a TOP 3 para evitar lista muy larga
+        # Si ya tenemos 3 prioridades, terminar
         if len(result_sequence) >= 3:
             break
     
